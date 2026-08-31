@@ -68,106 +68,141 @@ function TaskItem({ task, onToggle, onDelete, onPatch }) {
   if (editing) {
     return (
       <li className="task-item task-item-editing">
-        <input
-          type="checkbox"
-          checked={task.completed}
-          onChange={() => onToggle(task)}
-          disabled={saving}
-        />
-        <div className="task-edit-form">
-          <input
-            type="text"
-            value={editData.title}
-            onChange={(e) => setEditData({ ...editData, title: e.target.value })}
-            placeholder="Title"
-            disabled={saving}
-          />
-          <input
-            type="text"
-            value={editData.description}
-            onChange={(e) => setEditData({ ...editData, description: e.target.value })}
-            placeholder="Description (optional)"
-            disabled={saving}
-          />
-          <div className="edit-fields">
-            <select
-              value={editData.priority}
-              onChange={(e) => setEditData({ ...editData, priority: e.target.value })}
-              disabled={saving}
-            >
-              <option value="low">Low</option>
-              <option value="medium">Medium</option>
-              <option value="high">High</option>
-            </select>
-            <select
-              value={editData.status}
-              onChange={(e) => setEditData({ ...editData, status: e.target.value })}
-              disabled={saving}
-            >
-              <option value="todo">To Do</option>
-              <option value="in_progress">In Progress</option>
-              <option value="done">Done</option>
-            </select>
+        <div className="priority-bar priority-bar-editing" />
+        <div className="task-main">
+          <div className="task-edit-form">
+            <div className="edit-form-row">
+              <input
+                type="checkbox"
+                checked={task.completed}
+                onChange={() => onToggle(task)}
+                disabled={saving}
+              />
+              <input
+                type="text"
+                value={editData.title}
+                onChange={(e) => setEditData({ ...editData, title: e.target.value })}
+                placeholder="Title"
+                disabled={saving}
+                className="edit-title"
+              />
+            </div>
             <input
-              type="date"
-              value={editData.due_date}
-              onChange={(e) => setEditData({ ...editData, due_date: e.target.value })}
+              type="text"
+              value={editData.description}
+              onChange={(e) => setEditData({ ...editData, description: e.target.value })}
+              placeholder="Description (optional)"
               disabled={saving}
+              className="edit-description"
             />
-          </div>
-          <div className="edit-actions">
-            <button onClick={handleEditSave} disabled={saving || !editData.title.trim()}>
-              {saving ? "Saving..." : "Save"}
-            </button>
-            <button onClick={handleEditCancel} disabled={saving}>
-              Cancel
-            </button>
+            <div className="edit-fields">
+              <label>
+                Priority
+                <select
+                  value={editData.priority}
+                  onChange={(e) => setEditData({ ...editData, priority: e.target.value })}
+                  disabled={saving}
+                >
+                  <option value="low">Low</option>
+                  <option value="medium">Medium</option>
+                  <option value="high">High</option>
+                </select>
+              </label>
+              <label>
+                Status
+                <select
+                  value={editData.status}
+                  onChange={(e) => setEditData({ ...editData, status: e.target.value })}
+                  disabled={saving}
+                >
+                  <option value="todo">To Do</option>
+                  <option value="in_progress">In Progress</option>
+                  <option value="done">Done</option>
+                </select>
+              </label>
+              <label>
+                Due Date
+                <input
+                  type="date"
+                  value={editData.due_date}
+                  onChange={(e) => setEditData({ ...editData, due_date: e.target.value })}
+                  disabled={saving}
+                />
+              </label>
+            </div>
+            <div className="edit-actions">
+              <button className="btn-save" onClick={handleEditSave} disabled={saving || !editData.title.trim()}>
+                {saving ? "Saving..." : "Save"}
+              </button>
+              <button className="btn-cancel" onClick={handleEditCancel} disabled={saving}>
+                Cancel
+              </button>
+            </div>
           </div>
         </div>
       </li>
     );
   }
 
+  const priorityBarClass = `priority-bar priority-bar-${task.priority}`;
+  const taskItemClass = [
+    "task-item",
+    task.completed ? "task-completed" : "",
+    isOverdue() ? "task-overdue" : "",
+  ].filter(Boolean).join(" ");
+
   return (
-    <li className="task-item">
-      <input
-        type="checkbox"
-        checked={task.completed}
-        onChange={() => onToggle(task)}
-      />
-      <div className="task-content">
-        <div className="task-header">
-          <strong
-            style={{
-              textDecoration: task.completed ? "line-through" : "none",
-              opacity: task.completed ? 0.6 : 1,
-            }}
-          >
-            {task.title}
-          </strong>
-          <div className="task-badges">
-            <span className={priorityClass}>{task.priority}</span>
-            <span className={statusClass}>{statusLabel}</span>
+    <li className={taskItemClass}>
+      <div className={priorityBarClass} />
+      <div className="task-main">
+        <div className="task-top-row">
+          <input
+            type="checkbox"
+            checked={task.completed}
+            onChange={() => onToggle(task)}
+          />
+          <div className="task-content">
+            <div className="task-header">
+              <span className="task-title">{task.title}</span>
+              <div className="task-badges">
+                <span className={priorityClass}>{task.priority}</span>
+                <span className={statusClass}>{statusLabel}</span>
+              </div>
+            </div>
+
+            {task.description && (
+              <div className="task-description">{task.description}</div>
+            )}
+
+            {task.due_date && (
+              <div className={`task-due-date ${isOverdue() ? "overdue" : ""}`}>
+                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                  <circle cx="12" cy="12" r="10"/>
+                  <polyline points="12 6 12 12 16 14"/>
+                </svg>
+                Due {formatDate(task.due_date)}
+                {isOverdue() && <span className="overdue-label">overdue</span>}
+              </div>
+            )}
           </div>
         </div>
 
-        {task.description && (
-          <div className="task-description">{task.description}</div>
-        )}
-
-        {task.due_date && (
-          <div className={`task-due-date ${isOverdue() ? "overdue" : ""}`}>
-            Due: {formatDate(task.due_date)}
-            {isOverdue() && " (overdue)"}
-          </div>
-        )}
-      </div>
-
-      <div className="task-actions">
-        <button onClick={handleEditStart}>Edit</button>
-        <button onClick={() => onDelete(task.id)} className="delete-btn">
-          Delete
-        </button>
+        <div className="task-actions">
+          <button onClick={handleEditStart} className="btn-edit">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+              <path d="M17 3a2.85 2.83 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5Z"/>
+            </svg>
+            Edit
+          </button>
+          <button onClick={() => onDelete(task.id)} className="btn-delete">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+              <path d="M3 6h18"/>
+              <path d="M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6"/>
+              <path d="M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2"/>
+            </svg>
+            Delete
+          </button>
+        </div>
       </div>
     </li>
   );
