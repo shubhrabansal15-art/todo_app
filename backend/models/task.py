@@ -1,6 +1,6 @@
 from datetime import datetime, timezone
 
-from sqlalchemy import Boolean, DateTime, Integer, String, Text
+from sqlalchemy import Boolean, DateTime, Date, Enum, Integer, String, Text
 from sqlalchemy.orm import Mapped, mapped_column
 
 from database import Base
@@ -31,8 +31,32 @@ class Task(Base):
         nullable=False
     )
 
+    priority: Mapped[str] = mapped_column(
+        Enum("low", "medium", "high", name="task_priority"),
+        default="medium",
+        nullable=False
+    )
+
+    status: Mapped[str] = mapped_column(
+        Enum("todo", "in_progress", "done", name="task_status"),
+        default="todo",
+        nullable=False
+    )
+
+    due_date: Mapped[datetime | None] = mapped_column(
+        Date,
+        nullable=True
+    )
+
     created_at: Mapped[datetime] = mapped_column(
         DateTime,
         default=lambda: datetime.now(timezone.utc),
+        nullable=False
+    )
+
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime,
+        default=lambda: datetime.now(timezone.utc),
+        onupdate=lambda: datetime.now(timezone.utc),
         nullable=False
     )
