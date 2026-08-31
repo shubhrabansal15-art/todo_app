@@ -342,7 +342,7 @@ class TestSorting:
 
 
 # ===========================================================================
-# 7. Root endpoint
+# 7. Root and health endpoints
 # ===========================================================================
 
 class TestRoot:
@@ -350,3 +350,8 @@ class TestRoot:
         resp = client.get("/")
         assert resp.status_code == 200
         assert "message" in resp.json()
+
+    def test_health(self, client):
+        resp = client.get("/health")
+        assert resp.status_code == 200
+        assert resp.json() == {"status": "ok"}
