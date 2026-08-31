@@ -1,6 +1,6 @@
 from datetime import datetime, timezone
 
-from sqlalchemy import Boolean, DateTime, Date, Enum, Integer, String, Text
+from sqlalchemy import Boolean, DateTime, Date, Enum, ForeignKey, Integer, String, Text
 from sqlalchemy.orm import Mapped, mapped_column
 
 from database import Base
@@ -13,6 +13,13 @@ class Task(Base):
         Integer,
         primary_key=True,
         autoincrement=True
+    )
+
+    user_id: Mapped[int] = mapped_column(
+        Integer,
+        ForeignKey("users.id", ondelete="CASCADE"),
+        nullable=False,
+        index=True,
     )
 
     title: Mapped[str] = mapped_column(

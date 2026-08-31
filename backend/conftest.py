@@ -1,12 +1,13 @@
 import pytest
 from fastapi.testclient import TestClient
-from sqlalchemy import create_engine, event, String
+from sqlalchemy import create_engine, event
 from sqlalchemy.orm import sessionmaker
 
 from database import Base, get_db
 
-# Import the model so it registers with Base.metadata
+# Import models so they register with Base.metadata
 from models.task import Task  # noqa: F401
+from models.user import User  # noqa: F401
 
 
 # SQLite in-memory engine for tests
@@ -67,3 +68,34 @@ def client(db_session):
     with TestClient(app) as c:
         yield c
     app.dependency_overrides.clear()
+
+
+# ---------------------------------------------------------------------------
+# Auth helpers
+# ---------------------------------------------------------------------------
+
+from auth import create_access_token, hash_password
+
+
+@pytest.fixture
+def register_and_login(client):
+    """Register a user and return (token, user_dict)."""
+
+    def _register(email="test@example.com", password="securepass123"):
+        resp = client.post(
+            "/api/auth/register",
+            json={"email": email, "password": password},
+        )
+        assert resp.status_code == 201
+        data = resp.json()
+        return data["access_token"], data["user"]
+
+    return _register
+
+
+@pytest.fixture
+def auth_client(client, register_and_login):
+    """A TestClient pre-configured with a valid auth token."""
+    token, user = register_and_login()
+    client.headers["Authorization"] = f"Bearer {token}"
+    return client, user

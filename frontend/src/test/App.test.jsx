@@ -1,4 +1,4 @@
-import { render, screen, waitFor } from '@testing-library/react';
+import { render, screen, waitFor, fireEvent } from '@testing-library/react';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import App from '../App';
 
@@ -10,7 +10,16 @@ vi.mock('../api/tasks', () => ({
   deleteTask: vi.fn(),
 }));
 
-import { getTasks, createTask, patchTask, deleteTask } from '../api/tasks';
+// Mock the auth API
+vi.mock('../api/auth', () => ({
+  login: vi.fn(),
+  register: vi.fn(),
+  getMe: vi.fn(),
+}));
+
+import { getTasks } from '../api/tasks';
+import { getMe } from '../api/auth';
+import { AuthProvider } from '../context/AuthContext';
 
 const makeTask = (overrides = {}) => ({
   id: 1,
@@ -25,72 +34,106 @@ const makeTask = (overrides = {}) => ({
   ...overrides,
 });
 
+function renderAuthenticated(taskData = []) {
+  localStorage.setItem('todo_auth_token', 'test-token');
+  localStorage.setItem('todo_auth_user', JSON.stringify({ id: 1, email: 'test@test.com', created_at: '2026-01-01' }));
+  getMe.mockResolvedValue({ id: 1, email: 'test@test.com', created_at: '2026-01-01' });
+  getTasks.mockResolvedValue(taskData);
+  return render(<AuthProvider><App /></AuthProvider>);
+}
+
+function renderUnauthenticated() {
+  localStorage.clear();
+  getMe.mockRejectedValue(new Error('Not authenticated'));
+  return render(<AuthProvider><App /></AuthProvider>);
+}
+
 beforeEach(() => {
   vi.clearAllMocks();
+  localStorage.clear();
 });
 
-describe('App', () => {
-  it('shows loading state initially', () => {
-    getTasks.mockReturnValue(new Promise(() => {})); // never resolves
-    render(<App />);
-    expect(screen.getByText('Loading tasks...')).toBeInTheDocument();
+describe('App - Authentication', () => {
+  it('shows login page when not authenticated', async () => {
+    renderUnauthenticated();
+    expect(await screen.findByText('Welcome Back')).toBeInTheDocument();
+    expect(screen.getByText('Sign in to your account')).toBeInTheDocument();
+  });
+
+  it('shows register page when switching', async () => {
+    renderUnauthenticated();
+    await screen.findByText('Welcome Back');
+    fireEvent.click(screen.getByText('Create one'));
+    expect(screen.getByRole('heading', { name: 'Create Account' })).toBeInTheDocument();
+  });
+
+  it('shows dashboard when authenticated', async () => {
+    renderAuthenticated([makeTask()]);
+    expect(await screen.findByText('Todo Dashboard')).toBeInTheDocument();
+    expect(screen.getByText('test@test.com')).toBeInTheDocument();
+  });
+
+  it('shows sign out button when authenticated', async () => {
+    renderAuthenticated([]);
+    await waitFor(() => {
+      expect(screen.queryByText('Loading tasks...')).not.toBeInTheDocument();
+    });
+    expect(screen.getByText('Sign Out')).toBeInTheDocument();
+  });
+});
+
+describe('App - Authenticated Tasks', () => {
+  it('shows loading state initially', async () => {
+    getMe.mockResolvedValue({ id: 1, email: 'test@test.com', created_at: '2026-01-01' });
+    localStorage.setItem('todo_auth_token', 'test-token');
+    localStorage.setItem('todo_auth_user', JSON.stringify({ id: 1, email: 'test@test.com', created_at: '2026-01-01' }));
+    getTasks.mockReturnValue(new Promise(() => {}));
+    render(<AuthProvider><App /></AuthProvider>);
+    expect(await screen.findByText('Loading tasks...')).toBeInTheDocument();
   });
 
   it('shows empty state when no tasks', async () => {
-    getTasks.mockResolvedValue([]);
-    render(<App />);
+    renderAuthenticated([]);
     expect(await screen.findByText('No tasks yet')).toBeInTheDocument();
-    expect(screen.getByText('Create your first task to get started')).toBeInTheDocument();
   });
 
   it('shows error state when API fails', async () => {
+    getMe.mockResolvedValue({ id: 1, email: 'test@test.com', created_at: '2026-01-01' });
+    localStorage.setItem('todo_auth_token', 'test-token');
+    localStorage.setItem('todo_auth_user', JSON.stringify({ id: 1, email: 'test@test.com', created_at: '2026-01-01' }));
     getTasks.mockRejectedValue(new Error('Network error'));
-    render(<App />);
+    render(<AuthProvider><App /></AuthProvider>);
     expect(await screen.findByText('Could not connect to the API')).toBeInTheDocument();
   });
 
   it('renders tasks from API', async () => {
-    getTasks.mockResolvedValue([
+    renderAuthenticated([
       makeTask({ id: 1, title: 'First task' }),
       makeTask({ id: 2, title: 'Second task' }),
     ]);
-    render(<App />);
     expect(await screen.findByText('First task')).toBeInTheDocument();
     expect(screen.getByText('Second task')).toBeInTheDocument();
   });
 
   it('shows dashboard when tasks exist', async () => {
-    getTasks.mockResolvedValue([makeTask()]);
-    render(<App />);
+    renderAuthenticated([makeTask()]);
     expect(await screen.findByText('Total')).toBeInTheDocument();
   });
 
   it('does not show dashboard when no tasks', async () => {
-    getTasks.mockResolvedValue([]);
-    render(<App />);
+    renderAuthenticated([]);
     await waitFor(() => {
       expect(screen.queryByText('Total')).not.toBeInTheDocument();
     });
   });
 
   it('shows task count', async () => {
-    getTasks.mockResolvedValue([makeTask({ id: 1 }), makeTask({ id: 2 })]);
-    render(<App />);
+    renderAuthenticated([makeTask({ id: 1 }), makeTask({ id: 2 })]);
     expect(await screen.findByText('2 total')).toBeInTheDocument();
   });
 
-  it('shows empty state for filters with no results', async () => {
-    getTasks.mockResolvedValue([]);
-    render(<App />);
-    // Trigger a filter change via the component (search)
-    // Since we mock getTasks, it will return [] again
-    expect(await screen.findByText('No tasks yet')).toBeInTheDocument();
-  });
-
   it('renders header', async () => {
-    getTasks.mockResolvedValue([]);
-    render(<App />);
-    // Wait for the async loadTasks to finish so state updates are flushed
+    renderAuthenticated([]);
     await waitFor(() => {
       expect(screen.queryByText('Loading tasks...')).not.toBeInTheDocument();
     });

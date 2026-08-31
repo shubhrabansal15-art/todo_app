@@ -1,23 +1,45 @@
 from typing import Literal
 
-from fastapi import APIRouter, Depends, HTTPException, Query
+from fastapi import APIRouter, Depends, HTTPException, Query, status
 from sqlalchemy import desc, asc
 from sqlalchemy.orm import Session
 
+from auth import get_current_user
 from database import get_db
 from models.task import Task
+from models.user import User
 from schemas.task import TaskCreate, TaskUpdate, TaskResponse
 
 
 router = APIRouter(
     prefix="/api/tasks",
-    tags=["Tasks"]
+    tags=["Tasks"],
 )
 
 
-@router.post("/", response_model=TaskResponse)
-def create_task(task: TaskCreate, db: Session = Depends(get_db)):
+def _get_user_task(task_id: int, user: User, db: Session) -> Task:
+    """Fetch a task that belongs to the authenticated user, or 404."""
+    task = (
+        db.query(Task)
+        .filter(Task.id == task_id, Task.user_id == user.id)
+        .first()
+    )
+    if task is None:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Task not found",
+        )
+    return task
+
+
+@router.post("/", response_model=TaskResponse, status_code=201)
+def create_task(
+    task: TaskCreate,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
     new_task = Task(
+        user_id=current_user.id,
         title=task.title,
         description=task.description,
         priority=task.priority,
@@ -35,6 +57,7 @@ def create_task(task: TaskCreate, db: Session = Depends(get_db)):
 @router.get("/", response_model=list[TaskResponse])
 def get_tasks(
     db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
     status: str | None = Query(default=None, pattern=r"^(todo|in_progress|done)$"),
     priority: str | None = Query(default=None, pattern=r"^(low|medium|high)$"),
     completed: bool | None = Query(default=None),
@@ -42,7 +65,7 @@ def get_tasks(
     sort_by: Literal["created_at", "due_date", "priority", "title"] = Query(default="created_at"),
     order: Literal["asc", "desc"] = Query(default="desc"),
 ):
-    query = db.query(Task)
+    query = db.query(Task).filter(Task.user_id == current_user.id)
 
     if status is not None:
         query = query.filter(Task.status == status)
@@ -66,31 +89,22 @@ def get_tasks(
 
 
 @router.get("/{task_id}", response_model=TaskResponse)
-def get_task(task_id: int, db: Session = Depends(get_db)):
-    task = db.query(Task).filter(Task.id == task_id).first()
-
-    if task is None:
-        raise HTTPException(
-            status_code=404,
-            detail="Task not found"
-        )
-
-    return task
+def get_task(
+    task_id: int,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    return _get_user_task(task_id, current_user, db)
 
 
 @router.put("/{task_id}", response_model=TaskResponse)
 def update_task(
     task_id: int,
     task_data: TaskUpdate,
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
 ):
-    task = db.query(Task).filter(Task.id == task_id).first()
-
-    if task is None:
-        raise HTTPException(
-            status_code=404,
-            detail="Task not found"
-        )
+    task = _get_user_task(task_id, current_user, db)
 
     if task_data.title is not None:
         task.title = task_data.title
@@ -115,15 +129,10 @@ def update_task(
 def patch_task(
     task_id: int,
     task_data: TaskUpdate,
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
 ):
-    task = db.query(Task).filter(Task.id == task_id).first()
-
-    if task is None:
-        raise HTTPException(
-            status_code=404,
-            detail="Task not found"
-        )
+    task = _get_user_task(task_id, current_user, db)
 
     if task_data.title is not None:
         task.title = task_data.title
@@ -145,14 +154,12 @@ def patch_task(
 
 
 @router.delete("/{task_id}")
-def delete_task(task_id: int, db: Session = Depends(get_db)):
-    task = db.query(Task).filter(Task.id == task_id).first()
-
-    if task is None:
-        raise HTTPException(
-            status_code=404,
-            detail="Task not found"
-        )
+def delete_task(
+    task_id: int,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    task = _get_user_task(task_id, current_user, db)
 
     db.delete(task)
     db.commit()

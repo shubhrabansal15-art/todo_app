@@ -1,4 +1,10 @@
-const API_URL = `${import.meta.env.VITE_API_URL || "http://127.0.0.1:8000"}/api/tasks`;
+const BASE_URL = `${import.meta.env.VITE_API_URL || "http://127.0.0.1:8000"}`;
+const API_URL = `${BASE_URL}/api/tasks`;
+
+function getAuthHeaders() {
+  const token = localStorage.getItem("todo_auth_token");
+  return token ? { Authorization: `Bearer ${token}` } : {};
+}
 
 export async function getTasks(filters = {}) {
   const params = new URLSearchParams();
@@ -15,7 +21,11 @@ export async function getTasks(filters = {}) {
   const queryString = params.toString();
   const url = queryString ? `${API_URL}/?${queryString}` : `${API_URL}/`;
 
-  const response = await fetch(url);
+  const response = await fetch(url, { headers: getAuthHeaders() });
+
+  if (response.status === 401 || response.status === 403) {
+    throw new Error("AUTH_EXPIRED");
+  }
 
   if (!response.ok) {
     throw new Error("Failed to fetch tasks");
@@ -27,9 +37,7 @@ export async function getTasks(filters = {}) {
 export async function createTask({ title, description, priority, status, due_date }) {
   const response = await fetch(`${API_URL}/`, {
     method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-    },
+    headers: { "Content-Type": "application/json", ...getAuthHeaders() },
     body: JSON.stringify({
       title,
       description: description || null,
@@ -39,19 +47,15 @@ export async function createTask({ title, description, priority, status, due_dat
     }),
   });
 
-  if (!response.ok) {
-    throw new Error("Failed to create task");
-  }
-
+  if (response.status === 401 || response.status === 403) throw new Error("AUTH_EXPIRED");
+  if (!response.ok) throw new Error("Failed to create task");
   return response.json();
 }
 
 export async function updateTask(taskId, data) {
   const response = await fetch(`${API_URL}/${taskId}`, {
     method: "PUT",
-    headers: {
-      "Content-Type": "application/json",
-    },
+    headers: { "Content-Type": "application/json", ...getAuthHeaders() },
     body: JSON.stringify({
       title: data.title,
       description: data.description || null,
@@ -62,10 +66,8 @@ export async function updateTask(taskId, data) {
     }),
   });
 
-  if (!response.ok) {
-    throw new Error("Failed to update task");
-  }
-
+  if (response.status === 401 || response.status === 403) throw new Error("AUTH_EXPIRED");
+  if (!response.ok) throw new Error("Failed to update task");
   return response.json();
 }
 
@@ -80,27 +82,22 @@ export async function patchTask(taskId, data) {
 
   const response = await fetch(`${API_URL}/${taskId}`, {
     method: "PATCH",
-    headers: {
-      "Content-Type": "application/json",
-    },
+    headers: { "Content-Type": "application/json", ...getAuthHeaders() },
     body: JSON.stringify(body),
   });
 
-  if (!response.ok) {
-    throw new Error("Failed to update task");
-  }
-
+  if (response.status === 401 || response.status === 403) throw new Error("AUTH_EXPIRED");
+  if (!response.ok) throw new Error("Failed to update task");
   return response.json();
 }
 
 export async function deleteTask(taskId) {
   const response = await fetch(`${API_URL}/${taskId}`, {
     method: "DELETE",
+    headers: getAuthHeaders(),
   });
 
-  if (!response.ok) {
-    throw new Error("Failed to delete task");
-  }
-
+  if (response.status === 401 || response.status === 403) throw new Error("AUTH_EXPIRED");
+  if (!response.ok) throw new Error("Failed to delete task");
   return response.json();
 }

@@ -5,12 +5,15 @@ import {
   patchTask,
   deleteTask,
 } from "./api/tasks";
+import { useAuth } from "./context/AuthContext";
 import "./App.css";
 
 import TaskForm from "./components/TaskForm";
 import TaskList from "./components/TaskList";
 import TaskFilters from "./components/TaskFilters";
 import Dashboard from "./components/Dashboard";
+import LoginPage from "./pages/LoginPage";
+import RegisterPage from "./pages/RegisterPage";
 
 const DEFAULT_FILTERS = {
   status: undefined,
@@ -22,6 +25,9 @@ const DEFAULT_FILTERS = {
 };
 
 function App() {
+  const { user, loading: authLoading, logout, isAuthenticated } = useAuth();
+  const [authView, setAuthView] = useState("login");
+
   const [tasks, setTasks] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
@@ -31,19 +37,27 @@ function App() {
     try {
       setLoading(true);
       setError("");
-
       const data = await getTasks(filters);
       setTasks(data);
     } catch (err) {
+      if (err.message === "AUTH_EXPIRED") {
+        logout();
+        return;
+      }
       setError("Could not connect to the API");
     } finally {
       setLoading(false);
     }
-  }, [filters]);
+  }, [filters, logout]);
 
   useEffect(() => {
-    loadTasks();
-  }, [loadTasks]);
+    if (isAuthenticated) {
+      loadTasks();
+    } else {
+      setTasks([]);
+      setLoading(false);
+    }
+  }, [isAuthenticated, loadTasks]);
 
   function handleFilterChange(newFilter) {
     setFilters((prev) => ({ ...prev, ...newFilter }));
@@ -55,6 +69,7 @@ function App() {
       const newTask = await createTask(taskData);
       setTasks((currentTasks) => [...currentTasks, newTask]);
     } catch (err) {
+      if (err.message === "AUTH_EXPIRED") { logout(); return; }
       setError("Could not create task");
     }
   }
@@ -67,6 +82,7 @@ function App() {
         currentTasks.map((t) => (t.id === updatedTask.id ? updatedTask : t))
       );
     } catch (err) {
+      if (err.message === "AUTH_EXPIRED") { logout(); return; }
       setError("Could not update task");
     }
   }
@@ -79,6 +95,7 @@ function App() {
         currentTasks.map((t) => (t.id === updatedTask.id ? updatedTask : t))
       );
     } catch (err) {
+      if (err.message === "AUTH_EXPIRED") { logout(); return; }
       setError("Could not update task");
       throw err;
     }
@@ -90,15 +107,48 @@ function App() {
       await deleteTask(taskId);
       setTasks((currentTasks) => currentTasks.filter((t) => t.id !== taskId));
     } catch (err) {
+      if (err.message === "AUTH_EXPIRED") { logout(); return; }
       setError("Could not delete task");
     }
   }
 
+  // Show loading spinner during auth validation
+  if (authLoading) {
+    return (
+      <div className="auth-page">
+        <div className="loading-state">
+          <div className="loading-spinner" />
+          <p>Loading...</p>
+        </div>
+      </div>
+    );
+  }
+
+  // Show auth pages when not authenticated
+  if (!isAuthenticated) {
+    return authView === "register" ? (
+      <RegisterPage onSwitchToLogin={() => setAuthView("login")} />
+    ) : (
+      <LoginPage onSwitchToRegister={() => setAuthView("register")} />
+    );
+  }
+
+  // Authenticated dashboard
   return (
     <div className="app">
       <header className="app-header">
-        <h1>Todo Dashboard</h1>
-        <p className="app-subtitle">Manage your tasks and stay on track</p>
+        <div className="header-top">
+          <div>
+            <h1>Todo Dashboard</h1>
+            <p className="app-subtitle">Manage your tasks and stay on track</p>
+          </div>
+          <div className="user-menu">
+            <span className="user-email">{user?.email}</span>
+            <button className="btn-logout" onClick={logout}>
+              Sign Out
+            </button>
+          </div>
+        </div>
       </header>
 
       <TaskForm onCreate={handleCreate} />
