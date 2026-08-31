@@ -32,8 +32,10 @@ function LoginPage({ onSwitchToRegister }) {
   return (
     <div className="auth-page">
       <div className="auth-card">
-        <h1 className="auth-title">Welcome Back</h1>
-        <p className="auth-subtitle">Sign in to your account</p>
+        <div className="auth-logo">
+          <h1>Taskflow</h1>
+          <p>Sign in to your account</p>
+        </div>
 
         {error && <div className="auth-error">{error}</div>}
 

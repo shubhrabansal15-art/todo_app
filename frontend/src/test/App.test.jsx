@@ -2,7 +2,6 @@ import { render, screen, waitFor, fireEvent } from '@testing-library/react';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import App from '../App';
 
-// Mock the API module
 vi.mock('../api/tasks', () => ({
   getTasks: vi.fn(),
   createTask: vi.fn(),
@@ -10,11 +9,18 @@ vi.mock('../api/tasks', () => ({
   deleteTask: vi.fn(),
 }));
 
-// Mock the auth API
 vi.mock('../api/auth', () => ({
   login: vi.fn(),
   register: vi.fn(),
   getMe: vi.fn(),
+}));
+
+vi.mock('../api/client', () => ({
+  setAuthToken: vi.fn(),
+  setOnAuthExpired: vi.fn(),
+  resetAuthExpiredFlag: vi.fn(),
+  authFetch: vi.fn(),
+  BASE_URL: 'http://127.0.0.1:8000',
 }));
 
 import { getTasks } from '../api/tasks';
@@ -56,20 +62,21 @@ beforeEach(() => {
 describe('App - Authentication', () => {
   it('shows login page when not authenticated', async () => {
     renderUnauthenticated();
-    expect(await screen.findByText('Welcome Back')).toBeInTheDocument();
+    expect(await screen.findByText('Sign In')).toBeInTheDocument();
     expect(screen.getByText('Sign in to your account')).toBeInTheDocument();
   });
 
   it('shows register page when switching', async () => {
     renderUnauthenticated();
-    await screen.findByText('Welcome Back');
+    await screen.findByText('Sign In');
     fireEvent.click(screen.getByText('Create one'));
-    expect(screen.getByRole('heading', { name: 'Create Account' })).toBeInTheDocument();
+    // Register page should have the "Taskflow" heading and "Create Account" button
+    expect(screen.getByRole('button', { name: 'Create Account' })).toBeInTheDocument();
   });
 
-  it('shows dashboard when authenticated', async () => {
+  it('shows sidebar when authenticated', async () => {
     renderAuthenticated([makeTask()]);
-    expect(await screen.findByText('Todo Dashboard')).toBeInTheDocument();
+    expect(await screen.findByText('Taskflow')).toBeInTheDocument();
     expect(screen.getByText('test@test.com')).toBeInTheDocument();
   });
 
@@ -78,7 +85,18 @@ describe('App - Authentication', () => {
     await waitFor(() => {
       expect(screen.queryByText('Loading tasks...')).not.toBeInTheDocument();
     });
-    expect(screen.getByText('Sign Out')).toBeInTheDocument();
+    expect(screen.getByTitle('Sign out')).toBeInTheDocument();
+  });
+
+  it('clears authentication state on logout', async () => {
+    renderAuthenticated([]);
+    await waitFor(() => {
+      expect(screen.queryByText('Loading tasks...')).not.toBeInTheDocument();
+    });
+    fireEvent.click(screen.getByTitle('Sign out'));
+    await waitFor(() => {
+      expect(screen.getByText('Sign In')).toBeInTheDocument();
+    });
   });
 });
 
@@ -94,7 +112,7 @@ describe('App - Authenticated Tasks', () => {
 
   it('shows empty state when no tasks', async () => {
     renderAuthenticated([]);
-    expect(await screen.findByText('No tasks yet')).toBeInTheDocument();
+    expect(await screen.findByText('All caught up!')).toBeInTheDocument();
   });
 
   it('shows error state when API fails', async () => {
@@ -103,7 +121,9 @@ describe('App - Authenticated Tasks', () => {
     localStorage.setItem('todo_auth_user', JSON.stringify({ id: 1, email: 'test@test.com', created_at: '2026-01-01' }));
     getTasks.mockRejectedValue(new Error('Network error'));
     render(<AuthProvider><App /></AuthProvider>);
-    expect(await screen.findByText('Could not connect to the API')).toBeInTheDocument();
+    // Error appears in both topbar and view; use getAllByText
+    const errors = await screen.findAllByText('Could not connect to the API');
+    expect(errors.length).toBeGreaterThanOrEqual(1);
   });
 
   it('renders tasks from API', async () => {
@@ -115,29 +135,35 @@ describe('App - Authenticated Tasks', () => {
     expect(screen.getByText('Second task')).toBeInTheDocument();
   });
 
-  it('shows dashboard when tasks exist', async () => {
+  it('shows navigation links in sidebar', async () => {
     renderAuthenticated([makeTask()]);
-    expect(await screen.findByText('Total')).toBeInTheDocument();
+    await screen.findByText('Taskflow');
+    // Nav labels appear in both sidebar and mobile nav, so use getAllByText
+    expect(screen.getAllByText('Today').length).toBeGreaterThanOrEqual(1);
+    expect(screen.getAllByText('Upcoming').length).toBeGreaterThanOrEqual(1);
+    expect(screen.getAllByText('All Tasks').length).toBeGreaterThanOrEqual(1);
+    expect(screen.getAllByText('Projects').length).toBeGreaterThanOrEqual(1);
+    expect(screen.getAllByText('Settings').length).toBeGreaterThanOrEqual(1);
   });
 
-  it('does not show dashboard when no tasks', async () => {
-    renderAuthenticated([]);
-    await waitFor(() => {
-      expect(screen.queryByText('Total')).not.toBeInTheDocument();
-    });
-  });
-
-  it('shows task count', async () => {
-    renderAuthenticated([makeTask({ id: 1 }), makeTask({ id: 2 })]);
-    expect(await screen.findByText('2 total')).toBeInTheDocument();
-  });
-
-  it('renders header', async () => {
+  it('shows sidebar brand', async () => {
     renderAuthenticated([]);
     await waitFor(() => {
       expect(screen.queryByText('Loading tasks...')).not.toBeInTheDocument();
     });
-    expect(screen.getByText('Todo Dashboard')).toBeInTheDocument();
-    expect(screen.getByText('Manage your tasks and stay on track')).toBeInTheDocument();
+    expect(screen.getByText('Taskflow')).toBeInTheDocument();
+    expect(screen.getByText('Productivity Dashboard')).toBeInTheDocument();
+  });
+
+  it('does not show error for AUTH_EXPIRED', async () => {
+    getMe.mockResolvedValue({ id: 1, email: 'test@test.com', created_at: '2026-01-01' });
+    localStorage.setItem('todo_auth_token', 'test-token');
+    localStorage.setItem('todo_auth_user', JSON.stringify({ id: 1, email: 'test@test.com', created_at: '2026-01-01' }));
+    getTasks.mockRejectedValue(new Error('AUTH_EXPIRED'));
+    render(<AuthProvider><App /></AuthProvider>);
+    await waitFor(() => {
+      expect(screen.queryByText('Loading tasks...')).not.toBeInTheDocument();
+    });
+    expect(screen.queryByText('Could not connect to the API')).not.toBeInTheDocument();
   });
 });

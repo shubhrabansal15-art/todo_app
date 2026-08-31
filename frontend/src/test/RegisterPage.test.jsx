@@ -2,14 +2,12 @@ import { render, screen, fireEvent, waitFor } from '@testing-library/react';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import RegisterPage from '../pages/RegisterPage';
 
-// Mock auth API
 vi.mock('../api/auth', () => ({
   login: vi.fn(),
   register: vi.fn(),
   getMe: vi.fn(),
 }));
 
-// Mock AuthContext
 const mockSaveAuth = vi.fn();
 vi.mock('../context/AuthContext', () => ({
   useAuth: () => ({
@@ -29,12 +27,17 @@ beforeEach(() => {
 });
 
 describe('RegisterPage', () => {
-  it('renders email and password fields', () => {
+  it('renders email, password, and confirm password fields', () => {
     render(<RegisterPage onSwitchToLogin={vi.fn()} />);
     expect(screen.getByLabelText('Email')).toBeInTheDocument();
     expect(screen.getByLabelText('Password')).toBeInTheDocument();
     expect(screen.getByLabelText('Confirm Password')).toBeInTheDocument();
-    expect(screen.getByRole('heading', { name: 'Create Account' })).toBeInTheDocument();
+    expect(screen.getByText('Create Account')).toBeInTheDocument();
+  });
+
+  it('renders branding', () => {
+    render(<RegisterPage onSwitchToLogin={vi.fn()} />);
+    expect(screen.getByText('Taskflow')).toBeInTheDocument();
   });
 
   it('shows error when passwords do not match', async () => {

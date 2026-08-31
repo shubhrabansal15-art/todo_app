@@ -1,4 +1,5 @@
 from fastapi import APIRouter, Depends, HTTPException, status
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
 from auth import create_access_token, get_current_user, hash_password, verify_password
@@ -14,20 +15,19 @@ def register(data: UserRegister, db: Session = Depends(get_db)):
     # Normalize email
     email = data.email.strip().lower()
 
-    # Check for duplicate
-    existing = db.query(User).filter(User.email == email).first()
-    if existing:
-        raise HTTPException(
-            status_code=status.HTTP_409_CONFLICT,
-            detail="An account with this email already exists",
-        )
-
     user = User(
         email=email,
         password_hash=hash_password(data.password),
     )
     db.add(user)
-    db.commit()
+    try:
+        db.commit()
+    except IntegrityError:
+        db.rollback()
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="An account with this email already exists",
+        )
     db.refresh(user)
 
     token = create_access_token(user.id)

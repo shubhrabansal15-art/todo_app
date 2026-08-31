@@ -43,8 +43,10 @@ function RegisterPage({ onSwitchToLogin }) {
   return (
     <div className="auth-page">
       <div className="auth-card">
-        <h1 className="auth-title">Create Account</h1>
-        <p className="auth-subtitle">Get started with Todo Dashboard</p>
+        <div className="auth-logo">
+          <h1>Taskflow</h1>
+          <p>Get started with your tasks</p>
+        </div>
 
         {error && <div className="auth-error">{error}</div>}
 

@@ -7,7 +7,7 @@ function TaskForm({ onCreate }) {
   const [status, setStatus] = useState("todo");
   const [dueDate, setDueDate] = useState("");
   const [showError, setShowError] = useState(false);
-  const [isExpanded, setIsExpanded] = useState(false);
+  const [showDetails, setShowDetails] = useState(false);
 
   async function handleSubmit(event) {
     event.preventDefault();
@@ -31,7 +31,7 @@ function TaskForm({ onCreate }) {
     setStatus("todo");
     setDueDate("");
     setShowError(false);
-    setIsExpanded(false);
+    setShowDetails(false);
   }
 
   function handleTitleChange(e) {
@@ -57,22 +57,22 @@ function TaskForm({ onCreate }) {
               <span className="validation-error">Title is required</span>
             )}
           </div>
-          <button type="submit" className="btn-primary">
+          <button type="submit" className="btn btn-primary">
             Add Task
           </button>
         </div>
 
-        {!isExpanded && (
+        {!showDetails && (
           <button
             type="button"
-            className="btn-expand"
-            onClick={() => setIsExpanded(true)}
+            className="btn btn-ghost btn-sm"
+            onClick={() => setShowDetails(true)}
           >
             + Add details
           </button>
         )}
 
-        {isExpanded && (
+        {showDetails && (
           <div className="form-details">
             <div className="form-row">
               <label className="form-label">Description</label>
@@ -121,8 +121,8 @@ function TaskForm({ onCreate }) {
 
             <button
               type="button"
-              className="btn-collapse"
-              onClick={() => setIsExpanded(false)}
+              className="btn btn-ghost btn-sm"
+              onClick={() => setShowDetails(false)}
             >
               Fewer options
             </button>

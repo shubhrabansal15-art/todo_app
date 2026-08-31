@@ -2,14 +2,12 @@ import { render, screen, fireEvent, waitFor } from '@testing-library/react';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import LoginPage from '../pages/LoginPage';
 
-// Mock auth API
 vi.mock('../api/auth', () => ({
   login: vi.fn(),
   register: vi.fn(),
   getMe: vi.fn(),
 }));
 
-// Mock AuthContext
 const mockSaveAuth = vi.fn();
 vi.mock('../context/AuthContext', () => ({
   useAuth: () => ({
@@ -34,6 +32,12 @@ describe('LoginPage', () => {
     expect(screen.getByLabelText('Email')).toBeInTheDocument();
     expect(screen.getByLabelText('Password')).toBeInTheDocument();
     expect(screen.getByText('Sign In')).toBeInTheDocument();
+  });
+
+  it('renders branding', () => {
+    render(<LoginPage onSwitchToRegister={vi.fn()} />);
+    expect(screen.getByText('Taskflow')).toBeInTheDocument();
+    expect(screen.getByText('Sign in to your account')).toBeInTheDocument();
   });
 
   it('shows validation error when submitting empty form', async () => {

@@ -1,5 +1,10 @@
 import { createContext, useContext, useState, useEffect, useCallback } from "react";
 import { getMe } from "../api/auth";
+import {
+  setAuthToken,
+  setOnAuthExpired,
+  resetAuthExpiredFlag,
+} from "../api/client";
 
 const AuthContext = createContext(null);
 
@@ -19,20 +24,41 @@ export function AuthProvider({ children }) {
   const [token, setToken] = useState(() => localStorage.getItem(TOKEN_KEY));
   const [loading, setLoading] = useState(true);
 
-  // Validate stored token on mount
+  // Register the centralized auth-expired handler once
+  useEffect(() => {
+    setOnAuthExpired(() => {
+      // This is called by client.js when any API call gets 401/403
+      setToken(null);
+      setUser(null);
+      setAuthToken(null);
+      localStorage.removeItem(TOKEN_KEY);
+      localStorage.removeItem(USER_KEY);
+      resetAuthExpiredFlag();
+    });
+  }, []);
+
+  // Validate stored token on mount; refresh stale user data from /me
   useEffect(() => {
     async function validate() {
       if (!token) {
         setLoading(false);
         return;
       }
+
+      setAuthToken(token);
+
       try {
         const userData = await getMe(token);
+        // Refresh cached user data — /me is always authoritative
         setUser(userData);
         localStorage.setItem(USER_KEY, JSON.stringify(userData));
       } catch {
-        // Token expired or invalid
-        logout();
+        // Token expired or invalid — clear everything
+        setToken(null);
+        setUser(null);
+        setAuthToken(null);
+        localStorage.removeItem(TOKEN_KEY);
+        localStorage.removeItem(USER_KEY);
       } finally {
         setLoading(false);
       }
@@ -43,6 +69,7 @@ export function AuthProvider({ children }) {
   const saveAuth = useCallback((accessToken, userData) => {
     setToken(accessToken);
     setUser(userData);
+    setAuthToken(accessToken);
     localStorage.setItem(TOKEN_KEY, accessToken);
     localStorage.setItem(USER_KEY, JSON.stringify(userData));
   }, []);
@@ -50,6 +77,7 @@ export function AuthProvider({ children }) {
   const logout = useCallback(() => {
     setToken(null);
     setUser(null);
+    setAuthToken(null);
     localStorage.removeItem(TOKEN_KEY);
     localStorage.removeItem(USER_KEY);
   }, []);

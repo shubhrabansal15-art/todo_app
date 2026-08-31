@@ -1,4 +1,9 @@
+import os
 import pytest
+
+# Set JWT_SECRET before importing anything that touches auth.py
+os.environ.setdefault("JWT_SECRET", "test-secret-for-testing-only")
+
 from fastapi.testclient import TestClient
 from sqlalchemy import create_engine, event
 from sqlalchemy.orm import sessionmaker
