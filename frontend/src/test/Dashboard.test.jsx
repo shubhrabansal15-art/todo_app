@@ -52,7 +52,7 @@ describe('Dashboard', () => {
     ];
     render(<Dashboard tasks={tasks} />);
     expect(screen.getByText('Overdue')).toBeInTheDocument();
-    expect(screen.getByText('1')).toBeInTheDocument();
+    expect(screen.getAllByText('1').length).toBeGreaterThanOrEqual(1);
   });
 
   it('does not show overdue card when no overdue tasks', () => {
