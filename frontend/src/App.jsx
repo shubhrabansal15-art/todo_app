@@ -5,16 +5,20 @@ import {
   patchTask,
   deleteTask,
 } from "./api/tasks";
+import { getReminders } from "./api/reminders";
 import { useAuth } from "./context/AuthContext";
 import "./App.css";
 
+import Dashboard from "./components/Dashboard";
 import Sidebar from "./components/Sidebar";
 import MobileNav from "./components/MobileNav";
 import TaskForm from "./components/TaskForm";
 import TodayView from "./pages/TodayView";
 import UpcomingView from "./pages/UpcomingView";
 import AllTasksView from "./pages/AllTasksView";
-import ProjectsPlaceholder from "./pages/ProjectsPlaceholder";
+import ProjectsPage from "./pages/ProjectsPage";
+import ProjectDetail from "./pages/ProjectDetail";
+import RemindersPage from "./pages/RemindersPage";
 import SettingsPage from "./pages/SettingsPage";
 import LoginPage from "./pages/LoginPage";
 import RegisterPage from "./pages/RegisterPage";
@@ -24,28 +28,34 @@ function App() {
   const [authView, setAuthView] = useState("login");
 
   const [tasks, setTasks] = useState([]);
+  const [reminders, setReminders] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [currentView, setCurrentView] = useState("today");
+  const [selectedProjectId, setSelectedProjectId] = useState(null);
 
   const [filters, setFilters] = useState({
     status: undefined,
     priority: undefined,
     completed: undefined,
     search: undefined,
-    sort_by: "created_at",
+    sort_by: "priority",
     order: "desc",
   });
 
-  const loadTasks = useCallback(async () => {
+  const loadData = useCallback(async () => {
     try {
       setLoading(true);
       setError("");
-      const data = await getTasks(filters);
-      setTasks(data);
+      const [tasksData, remindersData] = await Promise.all([
+        getTasks(filters),
+        getReminders(),
+      ]);
+      setTasks(tasksData);
+      setReminders(remindersData);
     } catch (err) {
-      if (err.message === "AUTH_EXPIRED") return;
-      setError("Could not connect to the API");
+      console.error("Failed to load data:", err);
+      setError("Could not load data");
     } finally {
       setLoading(false);
     }
@@ -53,12 +63,13 @@ function App() {
 
   useEffect(() => {
     if (isAuthenticated) {
-      loadTasks();
+      loadData();
     } else {
       setTasks([]);
+      setReminders([]);
       setLoading(false);
     }
-  }, [isAuthenticated, loadTasks]);
+  }, [isAuthenticated, loadData]);
 
   function handleFilterChange(newFilter) {
     setFilters((prev) => ({ ...prev, ...newFilter }));
@@ -70,7 +81,7 @@ function App() {
       const newTask = await createTask(taskData);
       setTasks((currentTasks) => [...currentTasks, newTask]);
     } catch (err) {
-      if (err.message === "AUTH_EXPIRED") return;
+      console.error("Failed to create task:", err);
       setError("Could not create task");
     }
   }
@@ -83,7 +94,7 @@ function App() {
         currentTasks.map((t) => (t.id === updatedTask.id ? updatedTask : t))
       );
     } catch (err) {
-      if (err.message === "AUTH_EXPIRED") return;
+      console.error("Failed to update task:", err);
       setError("Could not update task");
     }
   }
@@ -96,7 +107,7 @@ function App() {
         currentTasks.map((t) => (t.id === updatedTask.id ? updatedTask : t))
       );
     } catch (err) {
-      if (err.message === "AUTH_EXPIRED") return;
+      console.error("Failed to update task:", err);
       setError("Could not update task");
       throw err;
     }
@@ -108,13 +119,19 @@ function App() {
       await deleteTask(taskId);
       setTasks((currentTasks) => currentTasks.filter((t) => t.id !== taskId));
     } catch (err) {
-      if (err.message === "AUTH_EXPIRED") return;
+      console.error("Failed to delete task:", err);
       setError("Could not delete task");
     }
   }
 
   function handleNavigate(view) {
     setCurrentView(view);
+    setSelectedProjectId(null);
+  }
+
+  function handleSelectProject(projectId) {
+    setSelectedProjectId(projectId);
+    setCurrentView("projectDetail");
   }
 
   if (authLoading) {
@@ -140,7 +157,9 @@ function App() {
     today: "Today",
     upcoming: "Upcoming",
     all: "All Tasks",
+    reminders: "Reminders",
     projects: "Projects",
+    projectDetail: "Project",
     settings: "Settings",
   }[currentView];
 
@@ -178,9 +197,18 @@ function App() {
         onClearError={() => setError("")}
       />
     ),
-    projects: <ProjectsPlaceholder />,
+    reminders: <RemindersPage />,
+    projects: (
+      <ProjectsPage onSelectProject={handleSelectProject} />
+    ),
+    projectDetail: (
+      <ProjectDetail
+        projectId={selectedProjectId}
+        onBack={() => setCurrentView("projects")}
+      />
+    ),
     settings: <SettingsPage user={user} onLogout={logout} />,
-  }[currentView];
+  };
 
   return (
     <div className="app-shell">
@@ -214,17 +242,10 @@ function App() {
           )}
 
           <div className="topbar-actions">
-            {error && (currentView === 'projects' || currentView === 'settings') && (
-              <div
-                className="error-banner"
-                style={{ margin: 0, padding: '6px 12px', borderRadius: 9999, fontSize: '0.75rem' }}
-              >
+            {error && (currentView === "projects" || currentView === "settings" || currentView === "projectDetail" || currentView === "reminders") && (
+              <div className="error-banner" style={{ margin: 0, padding: "6px 12px", borderRadius: 9999, fontSize: "0.75rem" }}>
                 {error}
-                <button
-                  className="error-banner-dismiss"
-                  onClick={() => setError('')}
-                  style={{ marginLeft: 8 }}
-                >
+                <button className="error-banner-dismiss" onClick={() => setError("")} style={{ marginLeft: 8 }}>
                   &times;
                 </button>
               </div>
@@ -233,11 +254,12 @@ function App() {
         </div>
 
         <div className="app-content">
+          <Dashboard tasks={tasks} reminders={reminders} />
           {(currentView === "today" || currentView === "upcoming") && (
             <TaskForm onCreate={handleCreate} />
           )}
 
-          {viewContent}
+          {viewContent[currentView]}
         </div>
       </div>
 

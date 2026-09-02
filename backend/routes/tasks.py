@@ -1,6 +1,7 @@
 from typing import Literal
 
 from fastapi import APIRouter, Depends, HTTPException, Query, status
+import sqlalchemy as sa
 from sqlalchemy import desc, asc
 from sqlalchemy.orm import Session
 
@@ -45,6 +46,7 @@ def create_task(
         priority=task.priority,
         status=task.status,
         due_date=task.due_date,
+        project_id=task.project_id,
     )
 
     db.add(new_task)
@@ -59,8 +61,9 @@ def get_tasks(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
     status: str | None = Query(default=None, pattern=r"^(todo|in_progress|done)$"),
-    priority: str | None = Query(default=None, pattern=r"^(low|medium|high)$"),
+    priority: str | None = Query(default=None, pattern=r"^(low|medium|high|urgent)$"),
     completed: bool | None = Query(default=None),
+    project_id: int | None = Query(default=None),
     search: str | None = Query(default=None, min_length=1),
     sort_by: Literal["created_at", "due_date", "priority", "title"] = Query(default="created_at"),
     order: Literal["asc", "desc"] = Query(default="desc"),
@@ -76,14 +79,29 @@ def get_tasks(
     if completed is not None:
         query = query.filter(Task.completed == completed)
 
+    if project_id is not None:
+        query = query.filter(Task.project_id == project_id)
+
     if search:
         search_term = f"%{search}%"
         query = query.filter(
             Task.title.ilike(search_term) | Task.description.ilike(search_term)
         )
 
-    sort_column = getattr(Task, sort_by)
-    query = query.order_by(desc(sort_column) if order == "desc" else asc(sort_column))
+    # Priority uses a custom ordering: urgent > high > medium > low
+    if sort_by == "priority":
+        priority_order = {"urgent": 0, "high": 1, "medium": 2, "low": 3}
+        priority_expr = sa.case(
+            (Task.priority == "urgent", 0),
+            (Task.priority == "high", 1),
+            (Task.priority == "medium", 2),
+            (Task.priority == "low", 3),
+            else_=4,
+        )
+        query = query.order_by(asc(priority_expr) if order == "asc" else desc(priority_expr))
+    else:
+        sort_column = getattr(Task, sort_by)
+        query = query.order_by(desc(sort_column) if order == "desc" else asc(sort_column))
 
     return query.all()
 
@@ -118,6 +136,8 @@ def update_task(
         task.status = task_data.status
     if task_data.due_date is not None:
         task.due_date = task_data.due_date
+    if task_data.project_id is not None:
+        task.project_id = task_data.project_id
 
     db.commit()
     db.refresh(task)
@@ -146,6 +166,8 @@ def patch_task(
         task.status = task_data.status
     if task_data.due_date is not None:
         task.due_date = task_data.due_date
+    if task_data.project_id is not None:
+        task.project_id = task_data.project_id
 
     db.commit()
     db.refresh(task)

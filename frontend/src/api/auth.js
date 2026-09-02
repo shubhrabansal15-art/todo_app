@@ -1,43 +1,71 @@
-const BASE_URL = `${import.meta.env.VITE_API_URL || "http://127.0.0.1:8000"}`;
+import { supabase } from "../lib/supabase";
 
+/**
+ * Register a new user with email and password.
+ * Returns { user, session } from Supabase.
+ */
 export async function register(email, password) {
-  const response = await fetch(`${BASE_URL}/api/auth/register`, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ email, password }),
+  const { data, error } = await supabase.auth.signUp({
+    email: email.trim().toLowerCase(),
+    password,
   });
 
-  if (!response.ok) {
-    const data = await response.json().catch(() => ({}));
-    throw new Error(data.detail || "Registration failed");
+  if (error) {
+    if (error.message.includes("already registered")) {
+      throw new Error("An account with this email already exists");
+    }
+    throw new Error(error.message || "Registration failed");
   }
 
-  return response.json();
+  return {
+    user: data.user,
+    session: data.session,
+  };
 }
 
+/**
+ * Login with email and password.
+ * Returns { user, session } from Supabase.
+ */
 export async function login(email, password) {
-  const response = await fetch(`${BASE_URL}/api/auth/login`, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ email, password }),
+  const { data, error } = await supabase.auth.signInWithPassword({
+    email: email.trim().toLowerCase(),
+    password,
   });
 
-  if (!response.ok) {
-    const data = await response.json().catch(() => ({}));
-    throw new Error(data.detail || "Login failed");
+  if (error) {
+    if (error.message.includes("Invalid login")) {
+      throw new Error("Invalid email or password");
+    }
+    throw new Error(error.message || "Login failed");
   }
 
-  return response.json();
+  return {
+    user: data.user,
+    session: data.session,
+  };
 }
 
-export async function getMe(token) {
-  const response = await fetch(`${BASE_URL}/api/auth/me`, {
-    headers: { Authorization: `Bearer ${token}` },
-  });
+/**
+ * Get the current authenticated user.
+ * Returns the user object or throws if not authenticated.
+ */
+export async function getMe() {
+  const { data: { user }, error } = await supabase.auth.getUser();
 
-  if (!response.ok) {
+  if (error || !user) {
     throw new Error("Not authenticated");
   }
 
-  return response.json();
+  return user;
+}
+
+/**
+ * Logout the current user.
+ */
+export async function logout() {
+  const { error } = await supabase.auth.signOut();
+  if (error) {
+    console.error("Logout error:", error);
+  }
 }

@@ -1,5 +1,4 @@
 import { useState } from "react";
-import { login } from "../api/auth";
 import { useAuth } from "../context/AuthContext";
 
 function LoginPage({ onSwitchToRegister }) {
@@ -7,7 +6,7 @@ function LoginPage({ onSwitchToRegister }) {
   const [password, setPassword] = useState("");
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
-  const { saveAuth } = useAuth();
+  const { login } = useAuth();
 
   async function handleSubmit(e) {
     e.preventDefault();
@@ -20,8 +19,8 @@ function LoginPage({ onSwitchToRegister }) {
 
     setLoading(true);
     try {
-      const data = await login(email.trim(), password);
-      saveAuth(data.access_token, data.user);
+      await login(email.trim(), password);
+      // Auth state updates automatically via onAuthStateChange
     } catch (err) {
       setError(err.message || "Login failed");
     } finally {
@@ -73,7 +72,11 @@ function LoginPage({ onSwitchToRegister }) {
 
         <p className="auth-switch">
           Don't have an account?{" "}
-          <button type="button" onClick={onSwitchToRegister} className="auth-link">
+          <button
+            type="button"
+            onClick={onSwitchToRegister}
+            className="auth-link"
+          >
             Create one
           </button>
         </p>

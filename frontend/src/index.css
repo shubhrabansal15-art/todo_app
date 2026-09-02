@@ -1,66 +1,96 @@
+/* ============================================
+   TASKFLOW DESIGN SYSTEM
+   Minimal, editorial, calm, premium
+   Canva/Pinterest-inspired restraint
+   ============================================ */
+
 :root {
-  /* Color palette */
-  --color-bg: #f8f9fb;
-  --color-surface: #ffffff;
-  --color-surface-hover: #f3f4f6;
-  --color-border: #e5e7eb;
-  --color-border-light: #f0f0f2;
-  --color-text: #6b7280;
-  --color-text-primary: #111827;
-  --color-text-secondary: #9ca3af;
+  /* --- Background & Surfaces --- */
+  --color-bg: #F8F7F4;
+  --color-surface: #FFFFFF;
+  --color-surface-hover: #F3F1ED;
+  --color-surface-warm: #FAF9F6;
 
-  /* Accent */
-  --color-primary: #6366f1;
-  --color-primary-hover: #4f46e5;
-  --color-primary-light: #eef2ff;
-  --color-primary-border: rgba(99, 102, 241, 0.3);
+  /* --- Borders --- */
+  --color-border: #E7E3DC;
+  --color-border-light: #EEEAE4;
+  --color-border-focus: #C8C4BC;
 
-  /* Semantic */
-  --color-danger: #ef4444;
-  --color-danger-light: #fef2f2;
-  --color-success: #10b981;
-  --color-success-light: #ecfdf5;
-  --color-warning: #f59e0b;
-  --color-warning-light: #fffbeb;
+  /* --- Text Hierarchy --- */
+  --color-text-primary: #242321;
+  --color-text: #77736C;
+  --color-text-secondary: #77736C;
+  --color-text-tertiary: #A29D94;
+  --color-text-muted: #A29D94;
 
-  /* Priority */
-  --priority-low: #3b82f6;
-  --priority-low-bg: #eff6ff;
-  --priority-medium: #f59e0b;
-  --priority-medium-bg: #fffbeb;
-  --priority-high: #ef4444;
-  --priority-high-bg: #fef2f2;
+  /* --- Primary Accent: Muted indigo — accent only, not dominant --- */
+  --color-primary: #6C63D9;
+  --color-primary-hover: #5B52C7;
+  --color-primary-light: #EEECFF;
+  --color-primary-border: rgba(108, 99, 217, 0.2);
+  --color-primary-muted: rgba(108, 99, 217, 0.08);
 
-  /* Status */
-  --status-todo: #6b7280;
-  --status-todo-bg: #f3f4f6;
-  --status-in-progress: #3b82f6;
-  --status-in-progress-bg: #eff6ff;
-  --status-done: #10b981;
-  --status-done-bg: #ecfdf5;
+  /* --- Semantic --- */
+  --color-success: #4F9B72;
+  --color-success-light: #EAF6EF;
+  --color-success-border: rgba(79, 155, 114, 0.15);
+  --color-warning: #C28A45;
+  --color-warning-light: #FBF3E6;
+  --color-warning-border: rgba(194, 138, 69, 0.15);
+  --color-danger: #C86666;
+  --color-danger-light: #FBECEC;
+  --color-danger-border: rgba(200, 102, 102, 0.15);
 
-  /* Sidebar */
-  --sidebar-bg: #111827;
-  --sidebar-text: #9ca3af;
-  --sidebar-text-active: #ffffff;
-  --sidebar-hover: #1f2937;
-  --sidebar-width: 260px;
+  /* --- Priority --- */
+  --priority-low: #7C98B8;
+  --priority-low-bg: #F1F5F9;
+  --priority-medium: #C9942E;
+  --priority-medium-bg: #FEF9EE;
+  --priority-high: #DC6B5E;
+  --priority-high-bg: #FEF3F2;
+  --priority-urgent: #B95757;
+  --priority-urgent-bg: #F9E9E9;
 
-  /* Layout */
+  /* --- Status --- */
+  --status-todo: #8C8580;
+  --status-todo-bg: #F3F1ED;
+  --status-in-progress: #6C63D9;
+  --status-in-progress-bg: #EEECFF;
+  --status-done: #4F9B72;
+  --status-done-bg: #EAF6EF;
+
+  /* --- Sidebar --- */
+  --sidebar-bg: #151A28;
+  --sidebar-surface: #1E2436;
+  --sidebar-text: #8991A3;
+  --sidebar-text-active: #D8DCE5;
+  --sidebar-hover: rgba(255, 255, 255, 0.05);
+  --sidebar-active: rgba(108, 99, 217, 0.85);
+  --sidebar-width: 256px;
+
+  /* --- Layout --- */
   --topbar-height: 60px;
-  --mobile-nav-height: 64px;
+  --mobile-nav-height: 56px;
 
-  /* Typography */
-  --font-sans: 'Inter', system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
-  --text-xs: 0.75rem;
-  --text-sm: 0.8125rem;
-  --text-base: 0.9375rem;
-  --text-lg: 1.125rem;
-  --text-xl: 1.25rem;
-  --text-2xl: 1.5rem;
-  --text-3xl: 1.875rem;
+  /* --- Typography --- */
+  --font-sans: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif;
+  --font-display: 'Inter', -apple-system, BlinkMacSystemFont, system-ui, sans-serif;
 
-  /* Spacing */
+  /* Type scale — precise sizes per spec */
+  --text-2xs: 0.625rem;   /* 10px - tiny labels */
+  --text-xs: 0.75rem;      /* 12px - metadata */
+  --text-sm: 0.875rem;     /* 14px - body/UI */
+  --text-base: 0.9375rem;  /* 15px - body/inputs */
+  --text-lg: 1rem;         /* 16px - buttons, nav */
+  --text-xl: 1.125rem;     /* 18px - section headings */
+  --text-2xl: 1.375rem;    /* 22px - major headings */
+  --text-3xl: 1.75rem;     /* 28px - page titles */
+  --text-4xl: 2rem;        /* 32px - large page titles */
+
+  /* Stat numbers */
+  --text-stat: 1.5rem;     /* 24px */
+
+  /* --- Spacing --- */
   --sp-1: 4px;
   --sp-2: 8px;
   --sp-3: 12px;
@@ -69,31 +99,34 @@
   --sp-6: 24px;
   --sp-8: 32px;
   --sp-10: 40px;
+  --sp-12: 48px;
+  --sp-16: 64px;
 
-  /* Radius */
-  --radius-sm: 6px;
-  --radius-md: 8px;
+  /* --- Border Radius (restrained) --- */
+  --radius-sm: 8px;
+  --radius-md: 10px;
   --radius-lg: 12px;
-  --radius-xl: 16px;
+  --radius-xl: 14px;
   --radius-full: 9999px;
 
-  /* Shadows */
-  --shadow-xs: 0 1px 2px rgba(0, 0, 0, 0.04);
-  --shadow-sm: 0 1px 3px rgba(0, 0, 0, 0.06), 0 1px 2px rgba(0, 0, 0, 0.04);
-  --shadow-md: 0 4px 6px rgba(0, 0, 0, 0.06), 0 2px 4px rgba(0, 0, 0, 0.04);
-  --shadow-lg: 0 10px 15px rgba(0, 0, 0, 0.08), 0 4px 6px rgba(0, 0, 0, 0.04);
+  /* --- Shadows (whisper-light) --- */
+  --shadow-xs: 0 1px 2px rgba(36, 35, 33, 0.03);
+  --shadow-sm: 0 1px 3px rgba(36, 35, 33, 0.04), 0 1px 2px rgba(36, 35, 33, 0.02);
+  --shadow-md: 0 4px 12px rgba(36, 35, 33, 0.04), 0 1px 4px rgba(36, 35, 33, 0.02);
+  --shadow-lg: 0 8px 24px rgba(36, 35, 33, 0.06), 0 2px 8px rgba(36, 35, 33, 0.03);
 
-  /* Transitions */
-  --transition-fast: 120ms ease;
-  --transition-normal: 200ms ease;
+  /* --- Transitions --- */
+  --transition-fast: 150ms cubic-bezier(0.25, 0.1, 0.25, 1);
+  --transition-normal: 250ms cubic-bezier(0.25, 0.1, 0.25, 1);
 
   font-family: var(--font-sans);
   font-size: 15px;
-  line-height: 1.5;
+  line-height: 1.55;
   color: var(--color-text);
   background: var(--color-bg);
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
+  text-rendering: optimizeLegibility;
 }
 
 *,
@@ -113,11 +146,12 @@ body {
 }
 
 h1, h2, h3, h4 {
-  font-family: var(--font-sans);
+  font-family: var(--font-display);
   font-weight: 600;
   color: var(--color-text-primary);
   margin: 0;
-  line-height: 1.3;
+  line-height: 1.25;
+  letter-spacing: -0.015em;
 }
 
 p { margin: 0; }
@@ -129,8 +163,24 @@ ul { list-style: none; padding: 0; margin: 0; }
 :focus-visible {
   outline: 2px solid var(--color-primary);
   outline-offset: 2px;
+  border-radius: var(--radius-sm);
 }
 
 ::placeholder {
-  color: var(--color-text-secondary);
+  color: var(--color-text-tertiary);
+}
+
+/* Refined scrollbar */
+::-webkit-scrollbar {
+  width: 5px;
+}
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+::-webkit-scrollbar-thumb {
+  background: var(--color-border);
+  border-radius: 3px;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: var(--color-text-tertiary);
 }

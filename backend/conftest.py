@@ -13,6 +13,8 @@ from database import Base, get_db
 # Import models so they register with Base.metadata
 from models.task import Task  # noqa: F401
 from models.user import User  # noqa: F401
+from models.project import Project  # noqa: F401
+from models.reminder import Reminder  # noqa: F401
 
 
 # SQLite in-memory engine for tests

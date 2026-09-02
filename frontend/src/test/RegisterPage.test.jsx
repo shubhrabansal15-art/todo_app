@@ -1,29 +1,44 @@
 import { render, screen, fireEvent, waitFor } from '@testing-library/react';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
+
+vi.mock('../lib/supabase', () => ({
+  supabase: {
+    auth: {
+      getSession: vi.fn().mockResolvedValue({ data: { session: null } }),
+      signUp: vi.fn(),
+      signInWithPassword: vi.fn(),
+      signOut: vi.fn(),
+      onAuthStateChange: vi.fn().mockReturnValue({
+        data: { subscription: { unsubscribe: vi.fn() } },
+      }),
+    },
+    from: vi.fn(),
+  },
+}));
+
+const mockRegister = vi.fn();
+
+vi.mock('../context/AuthContext', async () => {
+  const actual = await vi.importActual('../context/AuthContext');
+  return {
+    ...actual,
+    useAuth: vi.fn(),
+  };
+});
+
 import RegisterPage from '../pages/RegisterPage';
-
-vi.mock('../api/auth', () => ({
-  login: vi.fn(),
-  register: vi.fn(),
-  getMe: vi.fn(),
-}));
-
-const mockSaveAuth = vi.fn();
-vi.mock('../context/AuthContext', () => ({
-  useAuth: () => ({
-    saveAuth: mockSaveAuth,
-    user: null,
-    token: null,
-    loading: false,
-    isAuthenticated: false,
-    logout: vi.fn(),
-  }),
-}));
-
-import { register } from '../api/auth';
+import { useAuth } from '../context/AuthContext';
 
 beforeEach(() => {
   vi.clearAllMocks();
+  useAuth.mockReturnValue({
+    login: vi.fn(),
+    register: mockRegister,
+    logout: vi.fn(),
+    user: null,
+    loading: false,
+    isAuthenticated: false,
+  });
 });
 
 describe('RegisterPage', () => {
@@ -60,11 +75,8 @@ describe('RegisterPage', () => {
     expect(await screen.findByText('Password must be at least 8 characters')).toBeInTheDocument();
   });
 
-  it('calls register API and saveAuth on success', async () => {
-    register.mockResolvedValue({
-      access_token: 'abc123',
-      user: { id: 1, email: 'test@test.com', created_at: '2026-01-01' },
-    });
+  it('calls register on success', async () => {
+    mockRegister.mockResolvedValue({ user: { id: 'abc' }, session: {} });
     render(<RegisterPage onSwitchToLogin={vi.fn()} />);
 
     fireEvent.change(screen.getByLabelText('Email'), { target: { value: 'test@test.com' } });
@@ -73,13 +85,12 @@ describe('RegisterPage', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Create Account' }));
 
     await waitFor(() => {
-      expect(register).toHaveBeenCalledWith('test@test.com', 'password123');
-      expect(mockSaveAuth).toHaveBeenCalledWith('abc123', { id: 1, email: 'test@test.com', created_at: '2026-01-01' });
+      expect(mockRegister).toHaveBeenCalledWith('test@test.com', 'password123');
     });
   });
 
   it('shows error when registration fails', async () => {
-    register.mockRejectedValue(new Error('An account with this email already exists'));
+    mockRegister.mockRejectedValue(new Error('An account with this email already exists'));
     render(<RegisterPage onSwitchToLogin={vi.fn()} />);
 
     fireEvent.change(screen.getByLabelText('Email'), { target: { value: 'existing@test.com' } });

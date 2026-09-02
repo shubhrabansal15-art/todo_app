@@ -13,18 +13,20 @@ function SettingsPage({ user, onLogout }) {
         </div>
         <div className="settings-row">
           <span className="settings-label">User ID</span>
-          <span className="settings-value">#{user?.id}</span>
+          <span className="settings-value" style={{ fontSize: "0.75rem", fontFamily: "monospace" }}>
+            {user?.id?.slice(0, 8)}...
+          </span>
         </div>
         <div className="settings-row">
           <span className="settings-label">Member since</span>
           <span className="settings-value">
             {user?.created_at
               ? new Date(user.created_at).toLocaleDateString(undefined, {
-                  year: 'numeric',
-                  month: 'long',
-                  day: 'numeric',
+                  year: "numeric",
+                  month: "long",
+                  day: "numeric",
                 })
-              : 'Unknown'}
+              : "Unknown"}
           </span>
         </div>
       </div>
@@ -47,7 +49,7 @@ function SettingsPage({ user, onLogout }) {
         </div>
         <div className="settings-row">
           <span className="settings-label">Stack</span>
-          <span className="settings-value">React + FastAPI + MySQL</span>
+          <span className="settings-value">React + Supabase</span>
         </div>
       </div>
     </div>

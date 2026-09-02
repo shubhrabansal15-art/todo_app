@@ -105,6 +105,7 @@ function TaskItem({ task, onToggle, onDelete, onPatch }) {
                 >
                   <option value="low">Low</option>
                   <option value="medium">Medium</option>
+                  <option value="urgent">Urgent</option>
                   <option value="high">High</option>
                 </select>
               </label>

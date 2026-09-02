@@ -1,6 +1,12 @@
 import TaskCard from '../components/TaskCard';
 import EmptyState from '../components/EmptyState';
 
+const PRIORITY_ORDER = { urgent: 0, high: 1, medium: 2, low: 3 };
+
+function sortByPriority(tasks) {
+  return [...tasks].sort((a, b) => (PRIORITY_ORDER[a.priority] ?? 4) - (PRIORITY_ORDER[b.priority] ?? 4));
+}
+
 function TodayView({ tasks, loading, error, onToggle, onDelete, onPatch }) {
   if (loading) {
     return (
@@ -26,21 +32,29 @@ function TodayView({ tasks, loading, error, onToggle, onDelete, onPatch }) {
 
   const today = new Date().toISOString().split('T')[0];
 
-  const overdue = tasks.filter((t) => {
+  const overdue = sortByPriority(tasks.filter((t) => {
     if (!t.due_date || t.completed) return false;
     return t.due_date < today;
-  });
+  }));
 
-  const dueToday = tasks.filter((t) => {
+  const dueToday = sortByPriority(tasks.filter((t) => {
     if (t.completed) return false;
     return t.due_date === today;
-  });
+  }));
 
-  const noDueDate = tasks.filter(
-    (t) => !t.due_date && !t.completed && t.status === 'todo'
-  );
+  const urgentNoDate = sortByPriority(tasks.filter(
+    (t) => !t.due_date && !t.completed && t.priority === 'urgent'
+  ));
 
-  const totalVisible = overdue.length + dueToday.length + noDueDate.length;
+  const inProgressNoDueDate = sortByPriority(tasks.filter(
+    (t) => !t.due_date && !completed(t) && t.status === 'in_progress' && t.priority !== 'urgent'
+  ));
+
+  const regularTasks = sortByPriority(tasks.filter(
+    (t) => !t.due_date && !completed(t) && t.status !== 'in_progress' && t.priority !== 'urgent'
+  ));
+
+  const totalVisible = overdue.length + dueToday.length + urgentNoDate.length + inProgressNoDueDate.length + regularTasks.length;
 
   return (
     <>
@@ -52,7 +66,7 @@ function TodayView({ tasks, loading, error, onToggle, onDelete, onPatch }) {
       {totalVisible === 0 ? (
         <EmptyState
           title="All caught up!"
-          description="No tasks are due today. Enjoy your free time or create a new task."
+          description="No tasks need your attention today. Enjoy your free time or create a new task."
           icon="check"
         />
       ) : (
@@ -60,8 +74,8 @@ function TodayView({ tasks, loading, error, onToggle, onDelete, onPatch }) {
           {overdue.length > 0 && (
             <>
               <div className="tasks-section-header">
-                <h2 style={{ color: 'var(--color-danger)' }}>Overdue</h2>
-                <span className="task-count">{overdue.length}</span>
+                <h2>Overdue</h2>
+                <span className="task-count" style={{ color: 'var(--color-danger)' }}>{overdue.length}</span>
               </div>
               <div className="task-list">
                 {overdue.map((task) => (
@@ -85,14 +99,42 @@ function TodayView({ tasks, loading, error, onToggle, onDelete, onPatch }) {
             </>
           )}
 
-          {noDueDate.length > 0 && (
+          {urgentNoDate.length > 0 && (
             <>
               <div className="tasks-section-header">
-                <h2>No Due Date</h2>
-                <span className="task-count">{noDueDate.length}</span>
+                <h2>Urgent</h2>
+                <span className="task-count" style={{ color: 'var(--priority-urgent)' }}>{urgentNoDate.length}</span>
               </div>
               <div className="task-list">
-                {noDueDate.map((task) => (
+                {urgentNoDate.map((task) => (
+                  <TaskCard key={task.id} task={task} onToggle={onToggle} onDelete={onDelete} onPatch={onPatch} />
+                ))}
+              </div>
+            </>
+          )}
+
+          {inProgressNoDueDate.length > 0 && (
+            <>
+              <div className="tasks-section-header">
+                <h2>In Progress</h2>
+                <span className="task-count">{inProgressNoDueDate.length}</span>
+              </div>
+              <div className="task-list">
+                {inProgressNoDueDate.map((task) => (
+                  <TaskCard key={task.id} task={task} onToggle={onToggle} onDelete={onDelete} onPatch={onPatch} />
+                ))}
+              </div>
+            </>
+          )}
+
+          {regularTasks.length > 0 && (
+            <>
+              <div className="tasks-section-header">
+                <h2>Tasks</h2>
+                <span className="task-count">{regularTasks.length}</span>
+              </div>
+              <div className="task-list">
+                {regularTasks.map((task) => (
                   <TaskCard key={task.id} task={task} onToggle={onToggle} onDelete={onDelete} onPatch={onPatch} />
                 ))}
               </div>
@@ -110,6 +152,10 @@ function formatDate(dateStr) {
     month: 'long',
     day: 'numeric',
   });
+}
+
+function completed(task) {
+  return task.completed || task.status === 'done';
 }
 
 export default TodayView;

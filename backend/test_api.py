@@ -361,7 +361,7 @@ class TestValidation:
 
     def test_invalid_priority_rejected(self, auth_client):
         client, _ = auth_client
-        resp = client.post("/api/tasks/", json={"title": "X", "priority": "urgent"})
+        resp = client.post("/api/tasks/", json={"title": "X", "priority": "critical"})
         assert resp.status_code == 422
 
     def test_invalid_status_rejected(self, auth_client):
@@ -387,7 +387,7 @@ class TestValidation:
     def test_patch_invalid_priority_rejected(self, auth_client):
         client, _ = auth_client
         task = create_task(client)
-        resp = client.patch(f"/api/tasks/{task['id']}", json={"priority": "urgent"})
+        resp = client.patch(f"/api/tasks/{task['id']}", json={"priority": "critical"})
         assert resp.status_code == 422
 
 
@@ -668,3 +668,458 @@ class TestRegistrationIntegrity:
             User.email == "migrated@internal.invalid"
         ).first()
         assert migrated is None, "Migrated user should not exist in test DB"
+
+
+# ===========================================================================
+# 16. Projects - CRUD
+# ===========================================================================
+
+
+def create_project(client, **overrides):
+    """Create a project with sensible defaults, return the JSON response."""
+    payload = {
+        "name": "Test Project",
+        "description": "A test project",
+        "status": "active",
+        "priority": "medium",
+        "start_date": None,
+        "due_date": None,
+        "color": "#6366f1",
+        "icon": "📁",
+    }
+    payload.update(overrides)
+    resp = client.post("/api/projects/", json=payload)
+    assert resp.status_code == 201
+    return resp.json()
+
+
+class TestProjectCRUD:
+    def test_create_project(self, auth_client):
+        client, _ = auth_client
+        data = create_project(client, name="My Project")
+        assert data["name"] == "My Project"
+        assert data["description"] == "A test project"
+        assert data["status"] == "active"
+        assert data["priority"] == "medium"
+        assert data["task_count"] == 0
+        assert data["completed_task_count"] == 0
+        assert "id" in data
+
+    def test_get_projects(self, auth_client):
+        client, _ = auth_client
+        create_project(client, name="Project A")
+        create_project(client, name="Project B")
+        resp = client.get("/api/projects/")
+        assert resp.status_code == 200
+        assert len(resp.json()) == 2
+
+    def test_get_project_by_id(self, auth_client):
+        client, _ = auth_client
+        project = create_project(client, name="Find me")
+        resp = client.get(f"/api/projects/{project['id']}")
+        assert resp.status_code == 200
+        assert resp.json()["name"] == "Find me"
+
+    def test_update_project(self, auth_client):
+        client, _ = auth_client
+        project = create_project(client, name="Original")
+        resp = client.put(
+            f"/api/projects/{project['id']}",
+            json={"name": "Updated", "status": "completed"},
+        )
+        assert resp.status_code == 200
+        assert resp.json()["name"] == "Updated"
+        assert resp.json()["status"] == "completed"
+
+    def test_patch_project(self, auth_client):
+        client, _ = auth_client
+        project = create_project(client, name="Patch me")
+        resp = client.patch(f"/api/projects/{project['id']}", json={"status": "archived"})
+        assert resp.status_code == 200
+        assert resp.json()["status"] == "archived"
+        assert resp.json()["name"] == "Patch me"
+
+    def test_delete_project(self, auth_client):
+        client, _ = auth_client
+        project = create_project(client, name="Delete me")
+        resp = client.delete(f"/api/projects/{project['id']}")
+        assert resp.status_code == 200
+        resp = client.get(f"/api/projects/{project['id']}")
+        assert resp.status_code == 404
+
+    def test_delete_project_unlinks_tasks(self, auth_client):
+        client, _ = auth_client
+        project = create_project(client, name="With tasks")
+        task = create_task(client, title="Linked task")
+        client.patch(f"/api/tasks/{task['id']}", json={"project_id": project["id"]})
+        resp = client.delete(f"/api/projects/{project['id']}")
+        assert resp.status_code == 200
+        # Task should still exist but with project_id = None
+        task_resp = client.get(f"/api/tasks/{task['id']}")
+        assert task_resp.status_code == 200
+        assert task_resp.json()["project_id"] is None
+
+    def test_project_task_counts(self, auth_client):
+        client, _ = auth_client
+        project = create_project(client, name="Counting")
+        t1 = create_task(client, title="Task 1")
+        t2 = create_task(client, title="Task 2")
+        t3 = create_task(client, title="Task 3")
+        client.patch(f"/api/tasks/{t1['id']}", json={"project_id": project["id"]})
+        client.patch(f"/api/tasks/{t2['id']}", json={"project_id": project["id"]})
+        client.patch(f"/api/tasks/{t3['id']}", json={"project_id": project["id"], "completed": True})
+        resp = client.get(f"/api/projects/{project['id']}")
+        assert resp.json()["task_count"] == 3
+        assert resp.json()["completed_task_count"] == 1
+
+
+class TestProjectIsolation:
+    def test_user_a_cannot_see_user_b_projects(self, client):
+        resp_a = client.post("/api/auth/register", json={"email": "pa@example.com", "password": "securepass123"})
+        token_a = resp_a.json()["access_token"]
+        resp_b = client.post("/api/auth/register", json={"email": "pb@example.com", "password": "securepass123"})
+        token_b = resp_b.json()["access_token"]
+
+        client.headers["Authorization"] = f"Bearer {token_a}"
+        create_project(client, name="A's project")
+        project_id = client.get("/api/projects/").json()[0]["id"]
+
+        client.headers["Authorization"] = f"Bearer {token_b}"
+        resp = client.get(f"/api/projects/{project_id}")
+        assert resp.status_code == 404
+
+        resp = client.get("/api/projects/")
+        assert len(resp.json()) == 0
+
+    def test_user_a_cannot_modify_user_b_project(self, client):
+        resp_a = client.post("/api/auth/register", json={"email": "pa2@example.com", "password": "securepass123"})
+        token_a = resp_a.json()["access_token"]
+        resp_b = client.post("/api/auth/register", json={"email": "pb2@example.com", "password": "securepass123"})
+        token_b = resp_b.json()["access_token"]
+
+        client.headers["Authorization"] = f"Bearer {token_a}"
+        create_project(client, name="A's project")
+        project_id = client.get("/api/projects/").json()[0]["id"]
+
+        client.headers["Authorization"] = f"Bearer {token_b}"
+        resp = client.patch(f"/api/projects/{project_id}", json={"name": "Hacked"})
+        assert resp.status_code == 404
+
+    def test_unauthenticated_project_access(self, client):
+        assert client.get("/api/projects/").status_code == 401
+        assert client.post("/api/projects/", json={"name": "X"}).status_code == 401
+
+
+class TestProjectValidation:
+    def test_empty_name_rejected(self, auth_client):
+        client, _ = auth_client
+        resp = client.post("/api/projects/", json={"name": ""})
+        assert resp.status_code == 422
+
+    def test_invalid_status_rejected(self, auth_client):
+        client, _ = auth_client
+        resp = client.post("/api/projects/", json={"name": "X", "status": "invalid"})
+        assert resp.status_code == 422
+
+    def test_invalid_priority_rejected(self, auth_client):
+        client, _ = auth_client
+        resp = client.post("/api/projects/", json={"name": "X", "priority": "critical"})
+        assert resp.status_code == 422
+
+    def test_invalid_color_rejected(self, auth_client):
+        client, _ = auth_client
+        resp = client.post("/api/projects/", json={"name": "X", "color": "not-a-color"})
+        assert resp.status_code == 422
+
+
+class TestProjectFiltering:
+    @pytest.fixture(autouse=True)
+    def seed_projects(self, auth_client):
+        client, _ = auth_client
+        create_project(client, name="Alpha Project", priority="high", status="active")
+        create_project(client, name="Beta Project", priority="low", status="completed")
+        create_project(client, name="Gamma Project", priority="medium", status="archived")
+
+    def test_filter_by_status(self, auth_client):
+        client, _ = auth_client
+        resp = client.get("/api/projects/?status=active")
+        assert len(resp.json()) == 1
+        assert resp.json()[0]["status"] == "active"
+
+    def test_filter_by_priority(self, auth_client):
+        client, _ = auth_client
+        resp = client.get("/api/projects/?priority=high")
+        assert len(resp.json()) == 1
+        assert resp.json()[0]["priority"] == "high"
+
+    def test_search_by_name(self, auth_client):
+        client, _ = auth_client
+        resp = client.get("/api/projects/?search=Alpha")
+        assert len(resp.json()) == 1
+        assert "Alpha" in resp.json()[0]["name"]
+
+    def test_no_filter_returns_all(self, auth_client):
+        client, _ = auth_client
+        resp = client.get("/api/projects/")
+        assert len(resp.json()) == 3
+
+
+class TestProjectTaskAssociation:
+    def test_create_task_with_project(self, auth_client):
+        client, _ = auth_client
+        project = create_project(client)
+        task = create_task(client, title="Linked", project_id=project["id"])
+        assert task["project_id"] == project["id"]
+
+    def test_get_tasks_filtered_by_project(self, auth_client):
+        client, _ = auth_client
+        project = create_project(client)
+        t1 = create_task(client, title="In project")
+        t2 = create_task(client, title="Also in project")
+        create_task(client, title="Not in project")
+        client.patch(f"/api/tasks/{t1['id']}", json={"project_id": project["id"]})
+        client.patch(f"/api/tasks/{t2['id']}", json={"project_id": project["id"]})
+
+        resp = client.get(f"/api/tasks/?project_id={project['id']}")
+        assert resp.status_code == 200
+        assert len(resp.json()) == 2
+
+    def test_get_project_tasks_endpoint(self, auth_client):
+        client, _ = auth_client
+        project = create_project(client)
+        create_task(client, title="Task A")
+        create_task(client, title="Task B")
+
+        # Link tasks to project
+        tasks = client.get("/api/tasks/").json()
+        for t in tasks:
+            client.patch(f"/api/tasks/{t['id']}", json={"project_id": project["id"]})
+
+        resp = client.get(f"/api/projects/{project['id']}/tasks")
+        assert resp.status_code == 200
+        assert len(resp.json()) == 2
+
+
+# ===========================================================================
+# 17. Reminders - CRUD
+# ===========================================================================
+
+
+def create_reminder(client, **overrides):
+    """Create a reminder with sensible defaults, return the JSON response."""
+    payload = {
+        "title": "Test Reminder",
+        "description": "A test reminder",
+        "reminder_date": "2026-09-15",
+        "reminder_time": "09:00:00",
+        "task_id": None,
+        "project_id": None,
+    }
+    payload.update(overrides)
+    resp = client.post("/api/reminders/", json=payload)
+    assert resp.status_code == 201
+    return resp.json()
+
+
+class TestReminderCRUD:
+    def test_create_reminder(self, auth_client):
+        client, _ = auth_client
+        data = create_reminder(client, title="Meeting prep")
+        assert data["title"] == "Meeting prep"
+        assert data["status"] == "pending"
+        assert data["reminder_date"] == "2026-09-15"
+        assert "id" in data
+
+    def test_get_reminders(self, auth_client):
+        client, _ = auth_client
+        create_reminder(client, title="R1")
+        create_reminder(client, title="R2")
+        resp = client.get("/api/reminders/")
+        assert resp.status_code == 200
+        assert len(resp.json()) == 2
+
+    def test_get_reminder_by_id(self, auth_client):
+        client, _ = auth_client
+        reminder = create_reminder(client, title="Find me")
+        resp = client.get(f"/api/reminders/{reminder['id']}")
+        assert resp.status_code == 200
+        assert resp.json()["title"] == "Find me"
+
+    def test_update_reminder(self, auth_client):
+        client, _ = auth_client
+        reminder = create_reminder(client, title="Original")
+        resp = client.put(
+            f"/api/reminders/{reminder['id']}",
+            json={"title": "Updated", "status": "completed"},
+        )
+        assert resp.status_code == 200
+        assert resp.json()["title"] == "Updated"
+        assert resp.json()["status"] == "completed"
+
+    def test_patch_reminder(self, auth_client):
+        client, _ = auth_client
+        reminder = create_reminder(client, title="Patch me")
+        resp = client.patch(f"/api/reminders/{reminder['id']}", json={"status": "dismissed"})
+        assert resp.status_code == 200
+        assert resp.json()["status"] == "dismissed"
+        assert resp.json()["title"] == "Patch me"
+
+    def test_delete_reminder(self, auth_client):
+        client, _ = auth_client
+        reminder = create_reminder(client, title="Delete me")
+        resp = client.delete(f"/api/reminders/{reminder['id']}")
+        assert resp.status_code == 200
+        resp = client.get(f"/api/reminders/{reminder['id']}")
+        assert resp.status_code == 404
+
+    def test_complete_reminder(self, auth_client):
+        client, _ = auth_client
+        reminder = create_reminder(client, title="Complete me")
+        resp = client.patch(f"/api/reminders/{reminder['id']}", json={"status": "completed"})
+        assert resp.status_code == 200
+        assert resp.json()["status"] == "completed"
+
+    def test_dismiss_reminder(self, auth_client):
+        client, _ = auth_client
+        reminder = create_reminder(client, title="Dismiss me")
+        resp = client.patch(f"/api/reminders/{reminder['id']}", json={"status": "dismissed"})
+        assert resp.status_code == 200
+        assert resp.json()["status"] == "dismissed"
+
+
+class TestReminderIsolation:
+    def test_user_a_cannot_see_user_b_reminders(self, client):
+        resp_a = client.post("/api/auth/register", json={"email": "ra@example.com", "password": "securepass123"})
+        token_a = resp_a.json()["access_token"]
+        resp_b = client.post("/api/auth/register", json={"email": "rb@example.com", "password": "securepass123"})
+        token_b = resp_b.json()["access_token"]
+
+        client.headers["Authorization"] = f"Bearer {token_a}"
+        create_reminder(client, title="A's reminder")
+        reminder_id = client.get("/api/reminders/").json()[0]["id"]
+
+        client.headers["Authorization"] = f"Bearer {token_b}"
+        resp = client.get(f"/api/reminders/{reminder_id}")
+        assert resp.status_code == 404
+
+        resp = client.get("/api/reminders/")
+        assert len(resp.json()) == 0
+
+    def test_user_a_cannot_modify_user_b_reminder(self, client):
+        resp_a = client.post("/api/auth/register", json={"email": "ra2@example.com", "password": "securepass123"})
+        token_a = resp_a.json()["access_token"]
+        resp_b = client.post("/api/auth/register", json={"email": "rb2@example.com", "password": "securepass123"})
+        token_b = resp_b.json()["access_token"]
+
+        client.headers["Authorization"] = f"Bearer {token_a}"
+        create_reminder(client, title="A's reminder")
+        reminder_id = client.get("/api/reminders/").json()[0]["id"]
+
+        client.headers["Authorization"] = f"Bearer {token_b}"
+        resp = client.patch(f"/api/reminders/{reminder_id}", json={"title": "Hacked"})
+        assert resp.status_code == 404
+
+    def test_unauthenticated_reminder_access(self, client):
+        assert client.get("/api/reminders/").status_code == 401
+        assert client.post("/api/reminders/", json={"title": "X", "reminder_date": "2026-09-15"}).status_code == 401
+
+
+class TestReminderValidation:
+    def test_empty_title_rejected(self, auth_client):
+        client, _ = auth_client
+        resp = client.post("/api/reminders/", json={"title": "", "reminder_date": "2026-09-15"})
+        assert resp.status_code == 422
+
+    def test_missing_date_rejected(self, auth_client):
+        client, _ = auth_client
+        resp = client.post("/api/reminders/", json={"title": "No date"})
+        assert resp.status_code == 422
+
+    def test_invalid_status_rejected(self, auth_client):
+        client, _ = auth_client
+        resp = client.post("/api/reminders/", json={"title": "X", "reminder_date": "2026-09-15"})
+        assert resp.status_code == 201
+        reminder = resp.json()
+        resp = client.patch(f"/api/reminders/{reminder['id']}", json={"status": "invalid"})
+        assert resp.status_code == 422
+
+
+class TestReminderFiltering:
+    @pytest.fixture(autouse=True)
+    def seed_reminders(self, auth_client):
+        client, _ = auth_client
+        create_reminder(client, title="Overdue reminder", reminder_date="2020-01-01")
+        create_reminder(client, title="Future reminder", reminder_date="2099-12-31")
+        r = create_reminder(client, title="Done reminder", reminder_date="2026-09-10")
+        client.patch(f"/api/reminders/{r['id']}", json={"status": "completed"})
+
+    def test_filter_by_status(self, auth_client):
+        client, _ = auth_client
+        resp = client.get("/api/reminders/?status=pending")
+        assert len(resp.json()) == 2
+
+    def test_filter_by_overdue(self, auth_client):
+        client, _ = auth_client
+        resp = client.get("/api/reminders/?overdue=true")
+        assert len(resp.json()) == 1
+        assert resp.json()[0]["title"] == "Overdue reminder"
+
+    def test_filter_not_overdue(self, auth_client):
+        client, _ = auth_client
+        resp = client.get("/api/reminders/?overdue=false")
+        assert len(resp.json()) == 1
+        assert resp.json()[0]["title"] == "Future reminder"
+
+    def test_search_by_title(self, auth_client):
+        client, _ = auth_client
+        resp = client.get("/api/reminders/?search=Future")
+        assert len(resp.json()) == 1
+        assert "Future" in resp.json()[0]["title"]
+
+    def test_no_filter_returns_all(self, auth_client):
+        client, _ = auth_client
+        resp = client.get("/api/reminders/")
+        assert len(resp.json()) == 3
+
+
+class TestReminderTaskAssociation:
+    def test_create_reminder_with_task(self, auth_client):
+        client, _ = auth_client
+        task = create_task(client, title="Task with reminder")
+        reminder = create_reminder(client, title="Task reminder", task_id=task["id"])
+        assert reminder["task_id"] == task["id"]
+
+    def test_get_reminders_filtered_by_task(self, auth_client):
+        client, _ = auth_client
+        task = create_task(client, title="My task")
+        create_reminder(client, title="R1", task_id=task["id"])
+        create_reminder(client, title="R2", task_id=task["id"])
+        create_reminder(client, title="R3")
+
+        resp = client.get(f"/api/reminders/?task_id={task['id']}")
+        assert resp.status_code == 200
+        assert len(resp.json()) == 2
+
+    def test_create_reminder_with_project(self, auth_client):
+        client, _ = auth_client
+        project = create_project(client)
+        reminder = create_reminder(client, title="Project reminder", project_id=project["id"])
+        assert reminder["project_id"] == project["id"]
+
+
+class TestReminderSummary:
+    def test_summary_counts(self, auth_client):
+        client, _ = auth_client
+        create_reminder(client, title="Overdue", reminder_date="2020-01-01")
+        from datetime import date as d
+        today = d.today().isoformat()
+        create_reminder(client, title="Today", reminder_date=today)
+        create_reminder(client, title="Future", reminder_date="2099-12-31")
+
+        resp = client.get("/api/reminders/summary")
+        assert resp.status_code == 200
+        data = resp.json()
+        assert data["overdue_count"] == 1
+        assert data["today_count"] == 1
+        assert data["next_upcoming"] is not None
+        assert data["next_upcoming"]["title"] == "Future"

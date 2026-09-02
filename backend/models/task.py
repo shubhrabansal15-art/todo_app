@@ -22,6 +22,13 @@ class Task(Base):
         index=True,
     )
 
+    project_id: Mapped[int | None] = mapped_column(
+        Integer,
+        ForeignKey("projects.id", ondelete="SET NULL"),
+        nullable=True,
+        index=True,
+    )
+
     title: Mapped[str] = mapped_column(
         String(200),
         nullable=False
@@ -39,7 +46,7 @@ class Task(Base):
     )
 
     priority: Mapped[str] = mapped_column(
-        Enum("low", "medium", "high", name="task_priority"),
+        Enum("low", "medium", "high", "urgent", name="task_priority"),
         default="medium",
         nullable=False
     )

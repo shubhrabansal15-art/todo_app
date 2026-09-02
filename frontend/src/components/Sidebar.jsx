@@ -53,6 +53,17 @@ function Sidebar({ currentView, onNavigate, user, tasks, onLogout }) {
           <span className="nav-badge">{tasks.length}</span>
         </button>
 
+        <button
+          className={`sidebar-link ${currentView === 'reminders' ? 'active' : ''}`}
+          onClick={() => onNavigate('reminders')}
+        >
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+            <path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/>
+            <path d="M13.73 21a2 2 0 0 1-3.46 0"/>
+          </svg>
+          Reminders
+        </button>
+
         <div className="sidebar-section-label">Organize</div>
 
         <button
@@ -81,7 +92,13 @@ function Sidebar({ currentView, onNavigate, user, tasks, onLogout }) {
         {overdueCount > 0 && (
           <div className="sidebar-stat-row">
             <span>Overdue</span>
-            <span style={{ color: '#ef4444' }}>{overdueCount}</span>
+            <span style={{ color: '#C86666' }}>{overdueCount}</span>
+          </div>
+        )}
+        {getUrgentCount(tasks) > 0 && (
+          <div className="sidebar-stat-row">
+            <span>Urgent</span>
+            <span style={{ color: '#B95757' }}>{getUrgentCount(tasks)}</span>
           </div>
         )}
         <div className="sidebar-stat-row">
@@ -115,6 +132,10 @@ function getTodayCount(tasks) {
   return tasks.filter(
     (t) => !t.completed && (t.due_date === today || (!t.due_date && t.status === 'todo'))
   ).length;
+}
+
+function getUrgentCount(tasks) {
+  return tasks.filter((t) => t.priority === 'urgent' && !t.completed).length;
 }
 
 function getOverdueCount(tasks) {

@@ -1,94 +1,109 @@
 import { createContext, useContext, useState, useEffect, useCallback } from "react";
-import { getMe } from "../api/auth";
-import {
-  setAuthToken,
-  setOnAuthExpired,
-  resetAuthExpiredFlag,
-} from "../api/client";
+import { supabase } from "../lib/supabase";
 
 const AuthContext = createContext(null);
 
-const TOKEN_KEY = "todo_auth_token";
-const USER_KEY = "todo_auth_user";
-
+/**
+ * AuthProvider wraps the app and manages authentication state.
+ *
+ * Uses Supabase Auth for:
+ * - Session persistence (localStorage via Supabase client)
+ * - Token refresh (automatic)
+ * - Auth state changes (login, logout, refresh)
+ *
+ * The user object from Supabase Auth has:
+ * - id (UUID)
+ * - email
+ * - created_at
+ * - app_metadata
+ * - user_metadata
+ */
 export function AuthProvider({ children }) {
-  const [user, setUser] = useState(() => {
-    try {
-      const stored = localStorage.getItem(USER_KEY);
-      return stored ? JSON.parse(stored) : null;
-    } catch {
-      return null;
-    }
-  });
-
-  const [token, setToken] = useState(() => localStorage.getItem(TOKEN_KEY));
+  const [user, setUser] = useState(null);
   const [loading, setLoading] = useState(true);
 
-  // Register the centralized auth-expired handler once
   useEffect(() => {
-    setOnAuthExpired(() => {
-      // This is called by client.js when any API call gets 401/403
-      setToken(null);
-      setUser(null);
-      setAuthToken(null);
-      localStorage.removeItem(TOKEN_KEY);
-      localStorage.removeItem(USER_KEY);
-      resetAuthExpiredFlag();
+    // Get initial session
+    supabase.auth.getSession().then(({ data: { session } }) => {
+      setUser(session?.user ?? null);
+      setLoading(false);
     });
+
+    // Listen for auth state changes
+    const {
+      data: { subscription },
+    } = supabase.auth.onAuthStateChange((_event, session) => {
+      setUser(session?.user ?? null);
+      setLoading(false);
+    });
+
+    return () => subscription.unsubscribe();
   }, []);
 
-  // Validate stored token on mount; refresh stale user data from /me
-  useEffect(() => {
-    async function validate() {
-      if (!token) {
-        setLoading(false);
-        return;
-      }
+  /**
+   * Register a new user.
+   * Returns the auth response from Supabase.
+   */
+  const register = useCallback(async (email, password) => {
+    const { data, error } = await supabase.auth.signUp({
+      email: email.trim().toLowerCase(),
+      password,
+    });
 
-      setAuthToken(token);
-
-      try {
-        const userData = await getMe(token);
-        // Refresh cached user data — /me is always authoritative
-        setUser(userData);
-        localStorage.setItem(USER_KEY, JSON.stringify(userData));
-      } catch {
-        // Token expired or invalid — clear everything
-        setToken(null);
-        setUser(null);
-        setAuthToken(null);
-        localStorage.removeItem(TOKEN_KEY);
-        localStorage.removeItem(USER_KEY);
-      } finally {
-        setLoading(false);
+    if (error) {
+      if (error.message.includes("already registered")) {
+        throw new Error("An account with this email already exists");
       }
+      throw new Error(error.message || "Registration failed");
     }
-    validate();
-  }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
-  const saveAuth = useCallback((accessToken, userData) => {
-    setToken(accessToken);
-    setUser(userData);
-    setAuthToken(accessToken);
-    localStorage.setItem(TOKEN_KEY, accessToken);
-    localStorage.setItem(USER_KEY, JSON.stringify(userData));
+    return {
+      user: data.user,
+      session: data.session,
+    };
   }, []);
 
-  const logout = useCallback(() => {
-    setToken(null);
-    setUser(null);
-    setAuthToken(null);
-    localStorage.removeItem(TOKEN_KEY);
-    localStorage.removeItem(USER_KEY);
+  /**
+   * Login with email and password.
+   * Returns the auth response from Supabase.
+   */
+  const login = useCallback(async (email, password) => {
+    const { data, error } = await supabase.auth.signInWithPassword({
+      email: email.trim().toLowerCase(),
+      password,
+    });
+
+    if (error) {
+      if (error.message.includes("Invalid login")) {
+        throw new Error("Invalid email or password");
+      }
+      throw new Error(error.message || "Login failed");
+    }
+
+    return {
+      user: data.user,
+      session: data.session,
+    };
+  }, []);
+
+  /**
+   * Logout the current user.
+   */
+  const logout = useCallback(async () => {
+    const { error } = await supabase.auth.signOut();
+    if (error) {
+      console.error("Logout error:", error);
+    }
+    // Auth state change listener will set user to null
   }, []);
 
   const value = {
     user,
-    token,
     loading,
-    saveAuth,
+    register,
+    login,
     logout,
-    isAuthenticated: !!token && !!user,
+    isAuthenticated: !!user,
   };
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;

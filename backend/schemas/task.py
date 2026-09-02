@@ -3,25 +3,27 @@ from datetime import date, datetime
 from pydantic import BaseModel, ConfigDict, Field
 
 
-VALID_PRIORITIES = ("low", "medium", "high")
+VALID_PRIORITIES = ("low", "medium", "high", "urgent")
 VALID_STATUSES = ("todo", "in_progress", "done")
 
 
 class TaskCreate(BaseModel):
     title: str = Field(..., min_length=1, max_length=200)
     description: str | None = None
-    priority: str = Field(default="medium", pattern=r"^(low|medium|high)$")
+    priority: str = Field(default="medium", pattern=r"^(low|medium|high|urgent)$")
     status: str = Field(default="todo", pattern=r"^(todo|in_progress|done)$")
     due_date: date | None = None
+    project_id: int | None = None
 
 
 class TaskUpdate(BaseModel):
     title: str | None = Field(default=None, min_length=1, max_length=200)
     description: str | None = None
     completed: bool | None = None
-    priority: str | None = Field(default=None, pattern=r"^(low|medium|high)$")
+    priority: str | None = Field(default=None, pattern=r"^(low|medium|high|urgent)$")
     status: str | None = Field(default=None, pattern=r"^(todo|in_progress|done)$")
     due_date: date | None = None
+    project_id: int | None = None
 
 
 class TaskResponse(BaseModel):
@@ -32,6 +34,7 @@ class TaskResponse(BaseModel):
     priority: str
     status: str
     due_date: date | None
+    project_id: int | None = None
     created_at: datetime
     updated_at: datetime
 

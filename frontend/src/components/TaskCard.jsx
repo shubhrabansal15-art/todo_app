@@ -83,6 +83,7 @@ function TaskCard({ task, onToggle, onDelete, onPatch }) {
                 <option value="low">Low</option>
                 <option value="medium">Medium</option>
                 <option value="high">High</option>
+                <option value="urgent">Urgent</option>
               </select>
             </label>
             <label className="form-field">

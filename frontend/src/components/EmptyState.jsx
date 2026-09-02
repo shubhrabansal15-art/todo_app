@@ -22,6 +22,17 @@ const icons = {
       <polyline points="10 9 9 9 8 9"/>
     </svg>
   ),
+  bell: (
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+      <path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/>
+      <path d="M13.73 21a2 2 0 0 1-3.46 0"/>
+    </svg>
+  ),
+  folder: (
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+      <path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/>
+    </svg>
+  ),
 };
 
 function EmptyState({ title, description, icon = 'list' }) {
@@ -31,7 +42,7 @@ function EmptyState({ title, description, icon = 'list' }) {
         {icons[icon] || icons.list}
       </div>
       <h3 className="empty-state-title">{title}</h3>
-      <p className="empty-state-desc">{description}</p>
+      {description && <p className="empty-state-desc">{description}</p>}
     </div>
   );
 }
