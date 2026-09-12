@@ -1,5 +1,11 @@
 import { supabase } from "../lib/supabase";
 
+async function getCurrentUserId() {
+  const { data: { user }, error } = await supabase.auth.getUser();
+  if (error || !user) throw new Error("Not authenticated");
+  return user.id;
+}
+
 /**
  * Fetch reminders with optional filters.
  * RLS automatically scopes to the authenticated user.
@@ -73,9 +79,11 @@ export async function getReminder(reminderId) {
  * Create a new reminder.
  */
 export async function createReminder(data) {
+  const userId = await getCurrentUserId();
   const { data: created, error } = await supabase
     .from("reminders")
     .insert({
+      user_id: userId,
       title: data.title,
       description: data.description || null,
       reminder_date: data.reminder_date,

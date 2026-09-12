@@ -1,5 +1,11 @@
 import { supabase } from "../lib/supabase";
 
+async function getCurrentUserId() {
+  const { data: { user }, error } = await supabase.auth.getUser();
+  if (error || !user) throw new Error("Not authenticated");
+  return user.id;
+}
+
 /**
  * Fetch projects with optional filters and sorting.
  * RLS automatically scopes to the authenticated user.
@@ -73,9 +79,11 @@ export async function getProject(projectId) {
  * Create a new project.
  */
 export async function createProject(data) {
+  const userId = await getCurrentUserId();
   const { data: created, error } = await supabase
     .from("projects")
     .insert({
+      user_id: userId,
       name: data.name,
       description: data.description || null,
       status: data.status || "active",

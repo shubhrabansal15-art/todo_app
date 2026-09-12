@@ -1,5 +1,11 @@
 import { supabase } from "../lib/supabase";
 
+async function getCurrentUserId() {
+  const { data: { user }, error } = await supabase.auth.getUser();
+  if (error || !user) throw new Error("Not authenticated");
+  return user.id;
+}
+
 /**
  * Fetch tasks with optional filters, sorting, and search.
  * All queries are automatically scoped to the authenticated user via RLS.
@@ -55,9 +61,11 @@ export async function getTasks(filters = {}) {
  * Create a new task.
  */
 export async function createTask({ title, description, priority, status, due_date, project_id }) {
+  const userId = await getCurrentUserId();
   const { data, error } = await supabase
     .from("tasks")
     .insert({
+      user_id: userId,
       title,
       description: description || null,
       priority: priority || "medium",
